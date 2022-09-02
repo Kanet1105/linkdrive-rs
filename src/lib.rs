@@ -6,7 +6,7 @@ pub fn run_app() -> Result<(), Box<dyn std::error::Error>> {
     let mut web_driver = ChromeDriver::new()?;
     web_driver.add_keyword("ai")?;
     web_driver.add_keyword("supply chain")?;
-    web_driver.search();
+    web_driver.search()?;
     Ok(())
 }
 
