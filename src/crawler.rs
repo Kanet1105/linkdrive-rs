@@ -45,7 +45,7 @@ impl ChromeDriver {
     ///     let mut web_driver = ChromeDriver::new()?;
     ///     web_driver.add_keyword("ai")?;
     ///     web_driver.add_keyword("supply chain")?;
-    ///     web_driver.search();
+    ///     web_driver.search()?;
     ///     Ok(())
     /// }
     /// ```
