@@ -7,6 +7,7 @@ use headless_chrome::{Browser, LaunchOptionsBuilder, Tab};
 /// 
 /// Blocking client
 pub struct ChromeDriver {
+    browser: Browser,
     main_tab: Arc<Tab>,
     base_query_string: String,
     blank_token: String,
@@ -27,9 +28,11 @@ impl ChromeDriver {
         .headless(false)
         .build()?;
         let browser = Browser::new(options)?;
+        let tab = browser.wait_for_initial_tab()?;
 
         Ok(Self {
-            main_tab: browser.wait_for_initial_tab()?,
+            browser,
+            main_tab: tab,
             base_query_string: "https://www.sciencedirect.com/search?qs=".into(),
             blank_token: "%20".into(),
             query_string: Vec::<String>::new(),
@@ -65,10 +68,6 @@ impl ChromeDriver {
         Ok(())
     }
 
-    pub fn tab(&self) -> Arc<Tab> {
-        Arc::clone(&self.main_tab)
-    }
-
     pub fn search(&self) -> Result<(), Box<dyn std::error::Error>> {
         // too long..
         let outer_selector = "#main_content > div.SearchBody.row.transparent > div.transparent.results-container.col-xs-24.col-sm-16.col-lg-18.hidden-checkboxes.visible";
@@ -81,10 +80,10 @@ impl ChromeDriver {
             // timeout up to 10 seconds.
             let result_list = self.main_tab.wait_for_element_with_custom_timeout(&outer_selector, Duration::from_millis(10000))?;
             let a_list = result_list.wait_for_elements("a")?;
-            for a in a_list {
-                println!("{}", a.get_content()?);
-                println!("====================================================");
-            }
+            // for a in a_list {
+            //     println!("{}", a.get_content()?);
+            //     println!("====================================================");
+            // }
         }
         Ok(())
     }
