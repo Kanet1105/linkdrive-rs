@@ -26,6 +26,5 @@ pub fn test() -> Result<(), Box<dyn std::error::Error>> {
     let outer_selector = "#main_content > div.SearchBody.row.transparent > div.transparent.results-container.col-xs-24.col-sm-16.col-lg-18.hidden-checkboxes.visible";
     let result_list = tab.wait_for_element_with_custom_timeout(&outer_selector, Duration::from_millis(5000))?;
     let a_list = result_list.wait_for_elements("a")?;
-
     Ok(())
 }
