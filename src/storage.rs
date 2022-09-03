@@ -3,6 +3,27 @@ use std::fmt::Debug;
 use std::ops::Deref;
 use std::sync::Arc;
 
+/// All scraped papers are formatted to this struct and stored
+/// in the Storage.
+pub struct Paper {
+    pub title: String,
+    pub href: String,
+    pub keyword: String,
+    pub journal: String,
+    pub date_published: String,
+}
+
+/// Pretty-print on the console for debugging.
+impl Debug for Paper {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f, 
+            "title: {}\nhref: {}\nkeyword: {}\njournal: {}\ndate_published: {}",
+            self.title, self.href, self.keyword, self.journal, self.date_published,
+        )
+    }
+}
+
 pub struct Storage(Arc<Haystack>);
 
 impl Storage {
@@ -43,22 +64,3 @@ impl Haystack {
     }
 }
 
-// #[derive(Debug)]
-pub struct Paper {
-    pub title: String,
-    pub href: String,
-    pub keyword: String,
-    pub journal: String,
-    pub date_published: String,
-}
-
-/// Pretty-print on console.
-impl Debug for Paper {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(
-            f, 
-            "title: {}\nhref: {}\nkeyword: {}\njournal: {}\ndate_published: {}",
-            self.title, self.href, self.keyword, self.journal, self.date_published,
-        )
-    }
-}

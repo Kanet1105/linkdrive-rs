@@ -2,7 +2,7 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use super::Exception;
-use super::storage::Paper;
+use super::storage::{Paper, Storage};
 
 use headless_chrome::{Browser, Element, LaunchOptionsBuilder, Tab};
 use rayon::prelude::*;
@@ -18,6 +18,7 @@ pub struct ChromeDriver {
     blank_token: String,
     query_string: Vec<(String, String)>,
     max_indices_per_page: usize,
+    storage: Storage
 }
 
 impl ChromeDriver {
@@ -43,6 +44,7 @@ impl ChromeDriver {
             blank_token: "%20".into(),
             query_string: Vec::<(String, String)>::new(),
             max_indices_per_page: 25,
+            storage: Storage::new(),
         })
     }
 
@@ -80,6 +82,11 @@ impl ChromeDriver {
         Ok(())
     }
 
+    /// A getter function for Storage handle.
+    pub fn haystack(&self) -> Storage {
+        self.storage.clone()
+    }
+
     /// The function starts searching for result for each keyword, parse the element, 
     /// filter the result and saves only changes.
     pub fn search(&self) -> Result<(), Exception> {
@@ -98,14 +105,20 @@ impl ChromeDriver {
             let item_list = result_list.wait_for_elements("li")?;
 
             // Parallel parse() execution.
-            self.parse(item_list, keyword, &self.domain_string)?;
+            self.parse(item_list, keyword, &self.domain_string, self.haystack())?;
         }
 
         Ok(())
     }
 
     /// Multi-threaded parser utilizing ["rayon"].
-    pub fn parse(&self, item_list: Vec<Element>, keyword: &str, domain: &str) -> Result<(), Exception> {
+    pub fn parse(
+        &self, 
+        item_list: Vec<Element>, 
+        keyword: &str, 
+        domain: &str,
+        storage: Storage,
+    ) -> Result<(), Exception> {
         item_list
             .par_iter()
             .for_each(|item| {
@@ -129,6 +142,10 @@ impl ChromeDriver {
                         (href, tokens[7].to_string())
                     };
 
+                    // Continue only if the uid of the paper does not exist
+                    // in the Storage.
+
+
                     // Build the paper struct.
                     let paper = Paper {
                         title: elements[0].get_inner_text().unwrap(),
@@ -138,6 +155,7 @@ impl ChromeDriver {
                         date_published: "".to_string(),
                     };
 
+                    // Test to see if pretty-print of Paper struct works.
                     println!("{:?}", &paper);
                     println!("======================================================");    
                 }
