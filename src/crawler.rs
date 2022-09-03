@@ -1,7 +1,8 @@
 use std::sync::Arc;
 use std::time::Duration;
 
-use headless_chrome::{Browser, LaunchOptionsBuilder, Tab};
+use headless_chrome::{Browser, Element, LaunchOptionsBuilder, Tab};
+use rayon::prelude::*;
 
 /// # ChromeDriver
 /// 
@@ -12,7 +13,7 @@ pub struct ChromeDriver {
     base_query_string: String,
     blank_token: String,
     query_string: Vec<String>,
-    max_indices_per_page: u8,
+    max_indices_per_page: usize,
 }
 
 impl ChromeDriver {
@@ -49,6 +50,7 @@ impl ChromeDriver {
     ///     web_driver.add_keyword("ai")?;
     ///     web_driver.add_keyword("supply chain")?;
     ///     web_driver.search()?;
+    /// 
     ///     Ok(())
     /// }
     /// ```
@@ -65,6 +67,7 @@ impl ChromeDriver {
         query.push_str(&format!("&show={}", self.max_indices_per_page));
 
         self.query_string.push(query);
+
         Ok(())
     }
 
@@ -77,14 +80,23 @@ impl ChromeDriver {
                 .navigate_to(url)?
                 .wait_until_navigated()?;
                 
-            // timeout up to 10 seconds.
+            // timeout set to 10 seconds.
             let result_list = self.main_tab.wait_for_element_with_custom_timeout(&outer_selector, Duration::from_millis(10000))?;
             let a_list = result_list.wait_for_elements("a")?;
-            // for a in a_list {
-            //     println!("{}", a.get_content()?);
-            //     println!("====================================================");
-            // }
+            self.parse(a_list)?;
         }
+
+        Ok(())
+    }
+
+    pub fn parse(&self, element_list: Vec<Element>) -> Result<(), Box<dyn std::error::Error>> {
+        element_list
+            .par_iter()
+            .for_each(|i| {
+                let attr = i.get_content().unwrap();
+                println!("{}", attr);
+            });
+
         Ok(())
     }
 }
