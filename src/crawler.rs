@@ -11,6 +11,7 @@ use rayon::prelude::*;
 /// 
 /// Blocking client
 pub struct ChromeDriver {
+    #[allow(unused)]
     browser: Browser,
     main_tab: Arc<Tab>,
     domain_string: String,
@@ -144,7 +145,8 @@ impl ChromeDriver {
 
                     // Continue only if the uid of the paper does not exist
                     // in the Storage.
-
+                    let _ = uid;
+                    let _ = storage;
 
                     // Build the paper struct.
                     let paper = Paper {
