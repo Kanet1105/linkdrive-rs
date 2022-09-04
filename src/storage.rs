@@ -1,10 +1,49 @@
 use std::collections::HashMap;
 use std::fmt::Debug;
 use std::ops::Deref;
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
+
+/// Newtype for the hashmap.
+pub struct Storage(Arc<Mutex<HashMap<String, Paper>>>);
+
+impl Storage {
+    pub fn new() -> Self {
+        let map = HashMap::<String, Paper>::new();
+
+        Self(Arc::new(Mutex::new(map)))
+    }
+
+    pub fn contains(&self, key: &str) -> bool {
+        let storage_guard = self.lock().unwrap();
+        storage_guard.contains_key(key)
+    }
+
+    pub fn push(&self, key: &str, value: Paper) {
+        let mut storage_guard = self.lock().unwrap();
+        storage_guard.insert(key.into(), value);
+    }
+}
+
+/// Cloning a storage value returns a copy of the shared reference
+/// to the same value.
+impl Clone for Storage {
+    fn clone(&self) -> Self {
+        Self(Arc::clone(&self))
+    }
+}
+
+/// Dereferencing a storage value returns a reference to the shared 
+/// reference to the same storage value.
+impl Deref for Storage {
+    type Target = Arc<Mutex<HashMap<String, Paper>>>;
+
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
 
 /// All scraped papers are formatted to this struct and stored
-/// in the Storage.
+/// in the storage.
 pub struct Paper {
     pub title: String,
     pub href: String,
@@ -23,44 +62,3 @@ impl Debug for Paper {
         )
     }
 }
-
-pub struct Storage(Arc<Haystack>);
-
-impl Storage {
-    pub fn new() -> Self {
-        let haystack = Haystack::new();
-
-        Self(Arc::new(haystack))
-    }
-}
-
-impl Clone for Storage {
-    fn clone(&self) -> Self {
-        Self(Arc::clone(&self))
-    }
-}
-
-impl Deref for Storage {
-    type Target = Arc<Haystack>;
-
-    fn deref(&self) -> &Self::Target {
-        &self.0
-    }
-}
-
-pub struct Haystack {
-    stack: HashMap<String, String>,
-}
-
-impl Haystack {
-    pub fn new() -> Self {
-        Self {
-            stack: HashMap::<String, String>::new(),
-        }
-    }
-
-    pub fn contains(&self, key: &str) -> bool {
-        self.stack.contains_key(key)
-    }
-}
-
