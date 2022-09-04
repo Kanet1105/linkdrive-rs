@@ -174,10 +174,11 @@ impl ChromeDriver {
             .borrow_mut()
             .insert(keyword.into(), new_storage.clone())
         {
-            let storage_guard = storage.lock().unwrap();
+            let storage_guard = new_storage.lock().unwrap();
             for (uid, _paper) in &*storage_guard {
-                if !new_storage.contains(uid) {
-
+                if !storage.contains(uid) {
+                    unimplemented!();
+                    // Todo: write to a csv file.
                 }
             }
 
