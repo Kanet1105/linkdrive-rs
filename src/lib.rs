@@ -16,3 +16,9 @@ pub fn run_app() -> Result<(), Exception> {
     
     Ok(())
 }
+
+#[test]
+fn csv_writer() {
+    
+    // let mut writer = 
+}
