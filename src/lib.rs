@@ -1,5 +1,4 @@
 mod crawler;
-mod perf;
 mod storage;
 
 use crawler::ChromeDriver;
