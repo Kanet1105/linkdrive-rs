@@ -44,6 +44,7 @@ impl Deref for Storage {
 
 /// All scraped papers are formatted to this struct and stored
 /// in the storage.
+#[derive(serde::Serialize)]
 pub struct Paper {
     pub title: String,
     pub href: String,
