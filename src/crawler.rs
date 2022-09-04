@@ -1,3 +1,5 @@
+use std::cell::RefCell;
+use std::collections::HashMap;
 use std::sync::Arc;
 use std::time::Duration;
 
@@ -19,15 +21,15 @@ pub struct ChromeDriver {
     blank_token: String,
     query_string: Vec<(String, String)>,
     max_indices_per_page: usize,
-    storage: Storage
+    storage_map: RefCell<HashMap<String, Storage>>,
 }
 
 impl ChromeDriver {
-    /// The function initializes the web driver client with a read-only javascript Tab object.
+    /// The function initializes the web driver client with a read-only javascript "Tab" object.
     /// 
     /// [WARNING]
     /// 
-    /// Although Arc<Tab> seems to be thread-safe, the Tab object is actually a web api call
+    /// Although "Arc<Tab>" seems to be thread-safe, the Tab object is actually a web api call
     /// that returns a shared reference to the current window handle. Javascript Window object
     /// can be mutated at any point without the Rust implementation of interior mutability.
     pub fn new() -> Result<Self, Exception> {
@@ -45,7 +47,7 @@ impl ChromeDriver {
             blank_token: "%20".into(),
             query_string: Vec::<(String, String)>::new(),
             max_indices_per_page: 25,
-            storage: Storage::new(),
+            storage_map: RefCell::new(HashMap::<String, Storage>::new()),
         })
     }
 
@@ -83,13 +85,8 @@ impl ChromeDriver {
         Ok(())
     }
 
-    /// A getter function for Storage handle.
-    pub fn haystack(&self) -> Storage {
-        self.storage.clone()
-    }
-
-    /// The function starts searching for result for each keyword, parse the element, 
-    /// filter the result and saves only changes.
+    /// The function starts searching for result for each keyword, 
+    /// parses the html element, filters the result and saves changes.
     pub fn search(&self) -> Result<(), Exception> {
         let outer_selector = "#srp-results-list";
         let last_element = format!("#srp-results-list > ol > li:nth-child({})", self.max_indices_per_page);
@@ -106,20 +103,30 @@ impl ChromeDriver {
             let item_list = result_list.wait_for_elements("li")?;
 
             // Parallel parse() execution.
-            self.parse(item_list, keyword, &self.domain_string, self.haystack())?;
+            let new_storage = self.parse(item_list, keyword, &self.domain_string)?;
+
+            // "update_storage()" replaces the previous storage with the newer one.
+            self.update_storage(keyword, new_storage);
+
+            // Test to see if pretty-print of Paper struct works.
+            // let storage_guard = self.storage_map.borrow();
+            // let storage = storage_guard.get(keyword).unwrap();
+            // for (uid, paper) in &*storage.lock().unwrap() {
+            //     println!("UID : {}", &uid);
+            //     println!("{:?}", &paper);
+            //     println!("======================================================");
+            // }
         }
 
         Ok(())
     }
 
     /// Multi-threaded parser utilizing ["rayon"].
-    pub fn parse(
-        &self, 
-        item_list: Vec<Element>, 
-        keyword: &str, 
-        domain: &str,
-        storage: Storage,
-    ) -> Result<(), Exception> {
+    fn parse(&self, item_list: Vec<Element>, keyword: &str, domain: &str) -> Result<Storage, Exception> {
+        // Create a new storage to replace the current one with.
+        let new_storage = Storage::new();
+
+        // Parse items in the list.
         item_list
             .par_iter()
             .for_each(|item| {
@@ -140,13 +147,8 @@ impl ChromeDriver {
                         // The complete href.
                         let mut href = String::from(domain);
                         href.push_str(tokens[3]);
-                        (href, tokens[7].to_string())
+                        (href, tokens[3].to_string())
                     };
-
-                    // Continue only if the uid of the paper does not exist
-                    // in the Storage.
-                    let _ = uid;
-                    let _ = storage;
 
                     // Build the paper struct.
                     let paper = Paper {
@@ -157,12 +159,34 @@ impl ChromeDriver {
                         date_published: "".to_string(),
                     };
 
-                    // Test to see if pretty-print of Paper struct works.
-                    println!("{:?}", &paper);
-                    println!("======================================================");    
+                    // Insert the paper in the new storage with the uid as its key.
+                    new_storage.push(&uid, paper);
                 }
             });
 
-        Ok(())
+        Ok(new_storage)
+    }
+
+    /// Update is none other than overwriting the previous storage.
+    /// It does not care whether two storages are the same or not.
+    fn update_storage(&self, keyword: &str, new_storage: Storage) {
+        if let Some(storage) = self.storage_map
+            .borrow_mut()
+            .insert(keyword.into(), new_storage.clone())
+        {
+            let storage_guard = storage.lock().unwrap();
+            for (uid, _paper) in &*storage_guard {
+                if !new_storage.contains(uid) {
+
+                }
+            }
+
+            // // Test pretty-printing the paper.
+            // for (uid, paper) in &*storage_guard {
+            //     println!("UID : {}", &uid);
+            //     println!("{:?}", &paper);
+            //     println!("======================================================");
+            // }
+        }
     }
 }
