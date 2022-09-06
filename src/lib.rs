@@ -1,9 +1,12 @@
-mod configuration;
 mod crawler;
 mod storage;
 
-use configuration::validate_paths;
+use std::collections::HashMap;
+use std::env::current_dir;
+
 use crawler::ChromeDriver;
+
+use config::{self, Config, Value};
 
 /// Type aliasing for Box<dyn std::error::Error> that is used globally.
 pub type Exception = Box<dyn std::error::Error>;
@@ -13,58 +16,44 @@ pub fn run_app() -> Result<(), Exception> {
     let web_driver = ChromeDriver::new()?;
 
     loop {
-        // validate if all config files necessary to run the program is
-        // in the right paths.
-        validate_paths()?;
-        web_driver.search()?;
+        let config = load_config()?.get_table("default")?;
+        let keyword = extract(&config, "keyword")?;
+        web_driver.search(&keyword)?;
+        std::thread::sleep(std::time::Duration::from_secs(5));
     }
+}
+
+/// Load configurations from the Settings.toml file located at
+/// the program root directory.
+fn load_config() -> Result<Config, Exception> {
+    // The base path for configs ("./Settings.toml").
+    let mut settings_path = current_dir()?;
+    settings_path.push("Settings.toml");
+    let settings_path_str = settings_path.to_str().unwrap();
+
+    // Build the config file.
+    let config = Config::builder()
+        .add_source(config::File::with_name(settings_path_str))
+        .build()?;
+
+    Ok(config)
+}
+
+fn extract(config: &HashMap<String, Value>, key: &str) -> Result<Vec<String>, Exception> {
+    let extracted: Vec<String> = config
+        .get(key).unwrap()
+        .clone()
+        .into_array()?
+        .iter()
+        .map(|x| { x.to_string() })
+        .collect();
+    Ok(extracted)
 }
 
 #[test]
-fn csv_writer() {
-    use csv::WriterBuilder;
-    let mut csv_writer = WriterBuilder::new()
-        .from_path("new.csv")
+fn config_test() {
+    let settings = Config::builder()
+        .add_source(config::File::with_name("config/Keyword.toml"))
+        .build()
         .unwrap();
-
-    let p1 = Paper {
-        title: "p1".into(),
-        href: "https://google.com".into(),
-        keyword: "test1".into(),
-        journal: "test_journal1".into(),
-        date_published: "today".into(),
-    };
-
-    let p2 = Paper {
-        title: "p2".into(),
-        href: "https://naver.com".into(),
-        keyword: "test2".into(),
-        journal: "test_journal2".into(),
-        date_published: "tomorrow".into(),
-    };
-
-    csv_writer.serialize(p1).unwrap();
-    csv_writer.serialize(p2).unwrap();
-}
-
-#[derive(serde::Serialize)]
-/// All scraped papers are formatted to this struct and stored
-/// in the storage.
-pub struct Paper {
-    pub title: String,
-    pub href: String,
-    pub keyword: String,
-    pub journal: String,
-    pub date_published: String,
-}
-
-/// Pretty-print on the console for debugging.
-impl std::fmt::Debug for Paper {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(
-            f, 
-            "title: {}\nhref: {}\nkeyword: {}\njournal: {}\ndate_published: {}",
-            self.title, self.href, self.keyword, self.journal, self.date_published,
-        )
-    }
 }

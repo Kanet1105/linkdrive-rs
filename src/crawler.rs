@@ -19,7 +19,6 @@ pub struct ChromeDriver {
     domain_string: String,
     base_query_string: String,
     blank_token: String,
-    query_string: Vec<(String, String)>,
     max_indices_per_page: usize,
     storage_map: RefCell<HashMap<String, Storage>>,
 }
@@ -37,34 +36,21 @@ impl ChromeDriver {
         .headless(false)
         .build()?;
         let browser = Browser::new(options)?;
-        let tab = browser.wait_for_initial_tab()?;
+        let main_tab = browser.wait_for_initial_tab()?;
 
         Ok(Self {
             browser,
-            main_tab: tab,
+            main_tab,
             domain_string: "https://www.sciencedirect.com/".into(),
             base_query_string: "https://www.sciencedirect.com/search?qs=".into(),
             blank_token: "%20".into(),
-            query_string: Vec::<(String, String)>::new(),
             max_indices_per_page: 25,
             storage_map: RefCell::new(HashMap::<String, Storage>::new()),
         })
     }
 
-    /// Adds a new keyword to search for.
-    /// 
-    /// [Example]
-    /// ```
-    /// pub fn run_app() -> Result<(), Box<dyn std::error::Error>> {
-    ///     let mut web_driver = ChromeDriver::new()?;
-    ///     web_driver.add_keyword("ai")?;
-    ///     web_driver.add_keyword("supply chain")?;
-    ///     web_driver.search()?;
-    /// 
-    ///     Ok(())
-    /// }
-    /// ```
-    pub fn add_keyword(&mut self, keyword: &str) -> Result<(), Exception> {
+    // Adds a new keyword to search for.
+    pub fn query_from_keyword(&self, keyword: &str) -> Result<String, Exception> {
         // Split keyword argument at whitespaces into a token vector.
         let token = keyword
             .split_ascii_whitespace()
@@ -80,21 +66,21 @@ impl ChromeDriver {
         let mut query = String::from(&self.base_query_string);
         query.push_str(&search_keyword);
         query.push_str(&format!("&show={}", self.max_indices_per_page));
-        self.query_string.push((query, keyword.into()));
 
-        Ok(())
+        Ok(query)
     }
 
     /// The function starts searching for result for each keyword, 
     /// parses the html element, filters the result and saves changes.
-    pub fn search(&self) -> Result<(), Exception> {
+    pub fn search(&self, keyword_list: &Vec<String>) -> Result<(), Exception> {
         let outer_selector = "#srp-results-list";
         let last_element = format!("#srp-results-list > ol > li:nth-child({})", self.max_indices_per_page);
 
         // Scrape the page with initialized query strings.
-        for (url, keyword) in &self.query_string {
+        for keyword in keyword_list {
+            let url = self.query_from_keyword(keyword)?;
             self.main_tab
-                .navigate_to(url)?
+                .navigate_to(&url)?
                 .wait_until_navigated()?
                 .wait_for_element_with_custom_timeout(&last_element, Duration::from_millis(10000))?;
                 
@@ -107,15 +93,6 @@ impl ChromeDriver {
 
             // "update_storage()" replaces the previous storage with the newer one.
             self.update_storage(keyword, new_storage);
-
-            // Test to see if pretty-print of Paper struct works.
-            // let storage_guard = self.storage_map.borrow();
-            // let storage = storage_guard.get(keyword).unwrap();
-            // for (uid, paper) in &*storage.lock().unwrap() {
-            //     println!("UID : {}", &uid);
-            //     println!("{:?}", &paper);
-            //     println!("======================================================");
-            // }
         }
 
         Ok(())
