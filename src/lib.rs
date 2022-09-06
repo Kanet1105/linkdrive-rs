@@ -19,7 +19,8 @@ pub fn run_app() -> Result<(), Exception> {
         let config = load_config()?.get_table("default")?;
         let keyword = extract(&config, "keyword")?;
         web_driver.search(&keyword)?;
-        std::thread::sleep(std::time::Duration::from_secs(5));
+
+        std::thread::sleep(std::time::Duration::from_secs(10));
     }
 }
 
@@ -39,6 +40,7 @@ fn load_config() -> Result<Config, Exception> {
     Ok(config)
 }
 
+/// Extract the vector from the config hashmap and cast "Value" to "String".
 fn extract(config: &HashMap<String, Value>, key: &str) -> Result<Vec<String>, Exception> {
     let extracted: Vec<String> = config
         .get(key).unwrap()
@@ -48,12 +50,4 @@ fn extract(config: &HashMap<String, Value>, key: &str) -> Result<Vec<String>, Ex
         .map(|x| { x.to_string() })
         .collect();
     Ok(extracted)
-}
-
-#[test]
-fn config_test() {
-    let settings = Config::builder()
-        .add_source(config::File::with_name("config/Keyword.toml"))
-        .build()
-        .unwrap();
 }

@@ -50,7 +50,6 @@ pub struct Paper {
     pub href: String,
     pub keyword: String,
     pub journal: String,
-    pub date_published: String,
 }
 
 /// Pretty-print on the console for debugging.
@@ -58,8 +57,8 @@ impl Debug for Paper {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(
             f, 
-            "title: {}\nhref: {}\nkeyword: {}\njournal: {}\ndate_published: {}",
-            self.title, self.href, self.keyword, self.journal, self.date_published,
+            "title: {}\nhref: {}\nkeyword: {}\njournal: {}\n",
+            self.title, self.href, self.keyword, self.journal,
         )
     }
 }

@@ -16,6 +16,7 @@ pub struct ChromeDriver {
     #[allow(unused)]
     browser: Browser,
     main_tab: Arc<Tab>,
+    email_tab: Arc<Tab>,
     domain_string: String,
     base_query_string: String,
     blank_token: String,
@@ -37,10 +38,12 @@ impl ChromeDriver {
         .build()?;
         let browser = Browser::new(options)?;
         let main_tab = browser.wait_for_initial_tab()?;
+        let email_tab = browser.new_tab()?;
 
         Ok(Self {
             browser,
             main_tab,
+            email_tab,
             domain_string: "https://www.sciencedirect.com/".into(),
             base_query_string: "https://www.sciencedirect.com/search?qs=".into(),
             blank_token: "%20".into(),
@@ -66,6 +69,7 @@ impl ChromeDriver {
         let mut query = String::from(&self.base_query_string);
         query.push_str(&search_keyword);
         query.push_str(&format!("&show={}", self.max_indices_per_page));
+        query.push_str("&sortBy=date");
 
         Ok(query)
     }
@@ -133,7 +137,6 @@ impl ChromeDriver {
                         href,
                         keyword: keyword.into(),
                         journal: elements[1].get_inner_text().unwrap(),
-                        date_published: "".to_string(),
                     };
 
                     // Insert the paper in the new storage with the uid as its key.
@@ -151,20 +154,20 @@ impl ChromeDriver {
             .borrow_mut()
             .insert(keyword.into(), new_storage.clone())
         {
-            let storage_guard = new_storage.lock().unwrap();
-            for (uid, _paper) in &*storage_guard {
+            let new_storage_guard = new_storage.lock().unwrap();
+            for (uid, _paper) in &*new_storage_guard {
                 if !storage.contains(uid) {
                     unimplemented!();
-                    // Todo: write to a csv file.
                 }
             }
+        }
 
-            // // Test pretty-printing the paper.
-            // for (uid, paper) in &*storage_guard {
-            //     println!("UID : {}", &uid);
-            //     println!("{:?}", &paper);
-            //     println!("======================================================");
-            // }
+        // Test pretty-printing the paper.
+        let new_storage_guard = new_storage.lock().unwrap();
+        for (uid, paper) in &*new_storage_guard {
+            println!("UID : {}", &uid);
+            println!("{:?}", &paper);
+            println!("======================================================");
         }
     }
 }
