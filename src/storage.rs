@@ -57,7 +57,7 @@ impl Debug for Paper {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(
             f, 
-            "title: {}\nhref: {}\nkeyword: {}\njournal: {}\n",
+            "title: {}\nhref: {}\nkeyword: {}\njournal: {}",
             self.title, self.href, self.keyword, self.journal,
         )
     }
