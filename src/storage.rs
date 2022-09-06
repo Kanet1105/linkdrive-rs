@@ -46,10 +46,10 @@ impl Deref for Storage {
 /// in the storage.
 #[derive(serde::Serialize)]
 pub struct Paper {
-    pub title: String,
-    pub href: String,
     pub keyword: String,
+    pub title: String,
     pub journal: String,
+    pub href: String,
 }
 
 /// Pretty-print on the console for debugging.
