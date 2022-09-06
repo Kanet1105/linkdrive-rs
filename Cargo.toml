@@ -4,5 +4,8 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
+config = "0.13.1"
+csv = "1.1"
 headless_chrome = {git = "https://github.com/atroche/rust-headless-chrome", features = ["fetch"]}
 rayon = "1.5"
+serde = { version = "1", features = ["derive"] }
