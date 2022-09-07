@@ -44,8 +44,8 @@ impl Storage {
 
     /// Utilizes [std::mem::take] and [std::mem::replace] to replace the 
     /// current value with the new value.
-    pub fn update(&mut self, new_keyword: HashSet<String>) {
-        self.keyword = new_keyword;
+    pub fn update(&mut self, new_keyword: &HashSet<String>) {
+        self.keyword = new_keyword.clone();
         let updated_storage = mem::take(&mut self.up_storage);
         let _ = mem::replace(&mut self.storage, updated_storage);
     }
@@ -64,7 +64,8 @@ impl Debug for Paper {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(
             f, 
-            "title: {}\nhref: {}\nkeyword: {}\njournal: {}",
+            "\ttitle: {}\n\thref: {}\n\tkeyword: {}\n\tjournal: {}\n\
+            ==================================================\n",
             self.title, self.href, self.keyword, self.journal,
         )
     }
