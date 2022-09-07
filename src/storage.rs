@@ -1,50 +1,57 @@
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::fmt::Debug;
-use std::ops::Deref;
-use std::sync::{Arc, Mutex};
+use std::mem;
+use std::sync::RwLock;
 
-/// Newtype for the hashmap.
-pub struct Storage(Arc<Mutex<HashMap<String, Paper>>>);
+pub struct Storage {
+    keyword: HashSet<String>,
+    storage: RwLock<HashMap<String, Paper>>,
+    up_storage: RwLock<HashMap<String, Paper>>,
+}
 
 impl Storage {
     pub fn new() -> Self {
-        let map = HashMap::<String, Paper>::new();
+        let keyword = HashSet::<String>::new();
+        let storage = HashMap::<String, Paper>::new();
+        let up_storage = HashMap::<String, Paper>::new();
 
-        Self(Arc::new(Mutex::new(map)))
+        Self {
+            keyword,
+            storage: RwLock::new(storage),
+            up_storage: RwLock::new(up_storage),
+        }
+    }
+    
+    pub fn contains_key(&self, key: &str) -> bool {
+        let reader = self.storage.read().unwrap();
+        reader.contains_key(key)
     }
 
-    pub fn contains(&self, key: &str) -> bool {
-        let storage_guard = self.lock().unwrap();
-        storage_guard.contains_key(key)
+    /// Write to the new storage which will later update the current one.
+    /// It takes a tuple argument consisting of ("keyword", "href") and 
+    /// returns true if the new paper is uploaded.
+    pub fn insert(&self, key: (String, String), value: Paper) -> bool {
+        let (keyword, href) = key;
+        let mut writer = self.up_storage.write().unwrap();
+        writer.insert(href.to_string(), value);
+
+        if !self.contains_key(&href) && self.keyword.contains(&keyword) {
+            true
+        } else {
+            false
+        }
     }
 
-    pub fn push(&self, key: &str, value: Paper) {
-        let mut storage_guard = self.lock().unwrap();
-        storage_guard.insert(key.into(), value);
+    /// Utilizes [std::mem::take] and [std::mem::replace] to replace the 
+    /// current value with the new value.
+    pub fn update(&mut self, new_keyword: HashSet<String>) {
+        self.keyword = new_keyword;
+        let updated_storage = mem::take(&mut self.up_storage);
+        let _ = mem::replace(&mut self.storage, updated_storage);
     }
 }
 
-/// Cloning a storage value returns a copy of the shared reference
-/// to the same value.
-impl Clone for Storage {
-    fn clone(&self) -> Self {
-        Self(Arc::clone(&self))
-    }
-}
-
-/// Dereferencing a storage value returns a reference to the shared 
-/// reference to the same storage value.
-impl Deref for Storage {
-    type Target = Arc<Mutex<HashMap<String, Paper>>>;
-
-    fn deref(&self) -> &Self::Target {
-        &self.0
-    }
-}
-
-/// All scraped papers are formatted to this struct and stored
-/// in the storage.
-#[derive(serde::Serialize)]
+#[derive(Clone, serde::Serialize)]
 pub struct Paper {
     pub keyword: String,
     pub title: String,
