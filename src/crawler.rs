@@ -1,13 +1,13 @@
-use std::collections::HashSet;
 use std::ffi::OsString;
 use std::sync::Arc;
 use std::time::Duration;
 
-use super::Exception;
-use super::storage::{Paper, Storage};
-
 use headless_chrome::{Browser, Element, LaunchOptionsBuilder, Tab};
 use rayon::prelude::*;
+
+use crate::Exception;
+use crate::scheduler::Scheduler;
+use crate::storage::{Paper, Storage};
 
 /// # ChromeDriver
 /// 
@@ -75,12 +75,13 @@ impl ChromeDriver {
 
     /// The function starts searching for result for each keyword, 
     /// parses the html element, filters the result and saves changes.
-    pub fn search(&mut self, new_keyword: HashSet<String>) -> Result<(), Exception> {
+    pub fn search(&mut self, scheduler: &Scheduler) -> Result<(), Exception> {
         let outer_selector = "#srp-results-list";
         let last_element = format!("#srp-results-list > ol > li:nth-child({})", self.max_indices_per_page);
 
         // Scrape the page with initialized query strings.
-        for keyword in &new_keyword {
+        let new_keyword = scheduler.keyword();
+        for keyword in new_keyword {
             let url = self.query_from_keyword(keyword)?;
             self.main_tab
                 .navigate_to(&url)?
@@ -141,17 +142,11 @@ impl ChromeDriver {
                     // Build the uid tuple
                     let uid = (keyword.to_string(), href.to_string());
                     let result = storage.insert(uid, paper.clone());
-
+                    
+                    // Write to the file.
                     if result {
-                        todo!();
-                        // Write paper to the file.
+                        storage.write(paper).unwrap();
                     }
-                    // if storage.contains_key(&uid) {
-                    //     // Test pretty-printing the paper.
-                    //     println!("UID : {}, {}", &uid.0, &uid.1);
-                    //     println!("{:?}", &paper);
-                    //     println!("======================================================");
-                    // }
                 }
             });
 
