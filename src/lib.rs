@@ -1,4 +1,5 @@
 mod crawler;
+mod scheduler;
 mod storage;
 
 use std::collections::HashSet;
@@ -6,6 +7,7 @@ use std::fs;
 use std::env::current_dir;
 
 use crawler::ChromeDriver;
+use scheduler::Scheduler;
 
 use chrono::prelude::*;
 use config::{self, Config};
@@ -18,24 +20,37 @@ pub type Exception = Box<dyn std::error::Error>;
 
 /// The entry point of the app.
 pub fn run_app() -> Result<(), Exception> {
-    // Get "profile" table and extract "id" and "password" fields.
-    let id = value_to_string("profile", "id")?;
-    let password = value_to_string("profile", "password")?;
+    // Initialize the default scheduler as a mutable reference.
+    let mut scheduler = Scheduler::default();
 
-    if id == "" || password == "" {
-        panic!("Empty 'id' | 'password' for email.\nCheck the profile table in Settings.toml.");
-    }
+    // Initialize the Chrome web driver as a mutable reference.
+    let mut web_driver = ChromeDriver::new()?;
 
-    // Initialize the Chrome Web Driver.
-    let web_driver = ChromeDriver::new(&csv_path("Papers.csv")?)?;
+    // Apply any changes made to "Settings.toml" in a loop.
+    loop {    
+        // Check scheduler.
+        scheduler.set_scheduler()?;
 
-    loop {
+        // Get "profile" table and extract "id" and "password" fields.
+        let id = value_to_string("profile", "id")?;
+        let password = value_to_string("profile", "password")?;
+        if id == "" || password == "" {
+            panic!("Empty 'id' | 'password' for email.\nCheck the profile table in Settings.toml.");
+        }
+
         // Get "default" table and extract "keyword" and "email" fields.
         let keyword = value_to_hashset("default", "keyword")?;
         let email = value_to_string("default", "email")?;
+
+        // Search the web.
         web_driver.search(keyword)?;
-        // send_email(&id, &password, &email)?;
-        std::thread::sleep(std::time::Duration::from_secs(20));
+
+        // Send an email to the user.
+        if scheduler.is_now() {
+            // send_email(&id, &password, &email)?;
+        }
+        
+        std::thread::sleep(std::time::Duration::from_secs(60));
     }
 }
 
@@ -67,7 +82,7 @@ fn value_to_string(table: &str, key: &str) -> Result<String, Exception> {
     Ok(extracted)
 }
 
-/// Convert from "Value" to "Vec<String>" for the given table and the key.
+/// Convert from "Value" to "HashSet<String>" for the given table and the key.
 fn value_to_hashset(table: &str, key: &str) -> Result<HashSet<String>, Exception> {
     let config = load_config()?;
     let config_table = config.get_table(table)?;
@@ -78,7 +93,7 @@ fn value_to_hashset(table: &str, key: &str) -> Result<HashSet<String>, Exception
         .iter()
         .map(|x| { x.to_string() })
         .collect();
-
+    
     Ok(extracted)
 }
 
@@ -160,10 +175,4 @@ fn send_email_test() {
         Ok(_) => println!("Email sent successfully!"),
         Err(e) => panic!("Could not send email: {:?}", e),
     }
-}
-
-#[test]
-fn datetime_test() {
-    let local: DateTime<Local> = Local::now();
-    dbg!(local.weekday());
 }

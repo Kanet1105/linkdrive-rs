@@ -163,9 +163,10 @@ impl Scheduler {
         Ok(())
     }
 
-    pub fn set_scheduler(&mut self, config: &Config) -> Result<(), Exception> {
-        self.set_time(config)?;
-        self.set_weekday(config)?;
+    pub fn set_scheduler(&mut self) -> Result<(), Exception> {
+        let config = load_config()?;
+        self.set_time(&config)?;
+        self.set_weekday(&config)?;
 
         Ok(())
     }

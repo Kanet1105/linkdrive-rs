@@ -1,14 +1,11 @@
-use std::cell::RefCell;
-use std::collections::{HashMap, HashSet};
+use std::collections::HashSet;
 use std::ffi::OsString;
-use std::mem;
 use std::sync::Arc;
 use std::time::Duration;
 
 use super::Exception;
 use super::storage::{Paper, Storage};
 
-use csv::{Writer, WriterBuilder};
 use headless_chrome::{Browser, Element, LaunchOptionsBuilder, Tab};
 use rayon::prelude::*;
 
@@ -23,9 +20,7 @@ pub struct ChromeDriver {
     base_query_string: String,
     blank_token: String,
     max_indices_per_page: usize,
-    storage: RefCell<Storage>,
-    keyword_set: RefCell<HashSet<String>>,
-    file_path: String,
+    storage: Storage,
 }
 
 impl ChromeDriver {
@@ -36,7 +31,7 @@ impl ChromeDriver {
     /// Although "Arc<Tab>" seems to be thread-safe, the Tab object is actually a web api call
     /// that returns a shared reference to the current window handle. Javascript Window object
     /// can be mutated at any point without the Rust implementation of interior mutability.
-    pub fn new(file_path: &str) -> Result<Self, Exception> {
+    pub fn new() -> Result<Self, Exception> {
         let user_agent = OsString::from("--user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/104.0.0.0 Safari/537.36");
         let options = LaunchOptionsBuilder::default()
             .args(vec![&user_agent])
@@ -51,10 +46,8 @@ impl ChromeDriver {
             domain_string: "https://www.sciencedirect.com/".into(),
             base_query_string: "https://www.sciencedirect.com/search?qs=".into(),
             blank_token: "%20".into(),
-            max_indices_per_page: 100,
-            storage: RefCell::new(Storage::new()),
-            keyword_set: RefCell::new(HashSet::<String>::new()),
-            file_path: file_path.into(),
+            max_indices_per_page: 50,
+            storage: Storage::new(),
         })
     }
 
@@ -82,10 +75,7 @@ impl ChromeDriver {
 
     /// The function starts searching for result for each keyword, 
     /// parses the html element, filters the result and saves changes.
-    pub fn search(&self, new_keyword: HashSet<String>) -> Result<(), Exception> {
-        // Create a new storage to replace the current one with.
-        let new_storage = Storage::new();
-
+    pub fn search(&mut self, new_keyword: HashSet<String>) -> Result<(), Exception> {
         let outer_selector = "#srp-results-list";
         let last_element = format!("#srp-results-list > ol > li:nth-child({})", self.max_indices_per_page);
 
@@ -102,27 +92,23 @@ impl ChromeDriver {
                 &outer_selector, 
                 Duration::from_millis(10000)
             )?;
-            let item_list = result_list.wait_for_elements("li")?;
+            let li_list = result_list.wait_for_elements("li")?;
 
             // Parallel parse() execution.
-            self.parse(item_list, keyword, &self.domain_string, &new_storage)?;
+            self.parse(li_list, keyword, &self.domain_string)?;
         }
-        self.update(new_storage, new_keyword)?;
+        self.storage.update(new_keyword);
 
         Ok(())
     }
 
     /// Multi-threaded parser utilizing ["rayon"].
-    fn parse(
-        &self, item_list: Vec<Element>, keyword: &str, domain: &str, new_storage: &Storage
-    ) -> Result<(), Exception> {
+    fn parse(&self, item_list: Vec<Element>, keyword: &str, domain: &str) -> Result<(), Exception> {
+        let storage = &self.storage;
         // Parse items in the list.
         item_list
             .par_iter()
             .for_each(|item| {
-                // Get a clone of the new storage for the multi-threaded context.
-                let storage = new_storage.clone();
-
                 // Get attributes to check if the html element contains a valid result.
                 let attr = item.get_attributes()
                     .unwrap()
@@ -132,57 +118,42 @@ impl ChromeDriver {
                 if !attr.is_empty() && attr.len() == 4 {
                     let elements = item.wait_for_elements("a").unwrap();
 
-                    // Parse href and uid out of the content string.
-                    let (href, uid) = {
+                    // Parse href and uref out of the content string.
+                    let href = {
                         let content = elements[0].get_content().unwrap();
                         let tokens: Vec<_> = content.split('"').collect();
 
                         // The complete href.
                         let mut href = String::from(domain);
                         href.push_str(tokens[3]);
-                        (href, tokens[3].to_string())
+
+                        href
                     };
 
                     // Build the paper struct.
                     let paper = Paper {
                         title: elements[0].get_inner_text().unwrap(),
-                        href,
+                        href: href.to_string(),
                         keyword: keyword.into(),
                         journal: elements[1].get_inner_text().unwrap(),
                     };
 
-                    // Insert the paper in the new storage with the uid as its key.
-                    storage.push(&uid, paper);
+                    // Build the uid tuple
+                    let uid = (keyword.to_string(), href.to_string());
+                    let result = storage.insert(uid, paper.clone());
+
+                    if result {
+                        todo!();
+                        // Write paper to the file.
+                    }
+                    // if storage.contains_key(&uid) {
+                    //     // Test pretty-printing the paper.
+                    //     println!("UID : {}, {}", &uid.0, &uid.1);
+                    //     println!("{:?}", &paper);
+                    //     println!("======================================================");
+                    // }
                 }
             });
-
-        Ok(())
-    }
-
-    /// Update is none other than overwriting the previous storage.
-    /// It does not care whether two storages are the same or not.
-    fn update(&self, new_storage: Storage, new_keyword: HashSet<String>) -> Result<(), Exception> {
-        let mut storage_mutref = self.storage.borrow_mut();
-        let prev_storage = mem::replace(&mut *storage_mutref, new_storage);
-
-        let mut keyword_mutref = self.keyword_set.borrow_mut();
-        let prev_keyword = mem::replace(&mut *keyword_mutref, new_keyword);
-
-        // todo! => modularize update().
-        
-        // let current_storage = self.storage.borrow().lock().unwrap();
-        // let current_keyword = self.keyword_set.borrow();
-
-        // for (uid, paper) in &*current_storage {
-        //     if !prev_storage.contains(uid) && prev_keyword.contains(&paper.keyword) {
-
-        //     }
-
-        //     // Test pretty-printing the paper.
-        //     println!("UID : {}", &uid);
-        //     println!("{:?}", &paper);
-        //     println!("======================================================");
-        // }
 
         Ok(())
     }
