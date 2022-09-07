@@ -70,6 +70,22 @@ impl Display for WeekdayException {
     }
 }
 
+pub struct ProfileException(String);
+
+impl Debug for ProfileException {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "\n\t{}", &self.0)
+    }
+}
+
+impl Display for ProfileException {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "\n\t{}", &self.0)
+    }
+}
+
+impl Error for ProfileException {}
+
 pub enum UnitTime {
     Hour,
     Minute,
@@ -79,8 +95,8 @@ impl Error for WeekdayException {}
 
 /// Scheduler struct.
 /// 
-/// "update_scheduler()", "default()" and "is_now()" are 
-/// the only public interfaces in the struct.
+/// Getter functions which take &self are the 
+/// only public interfaces in the struct.
 pub struct Scheduler {
     hour: u32,
     minute: u32,
@@ -197,9 +213,19 @@ impl Scheduler {
             (id, password)
         };
 
+        if &id == "" || &password == "" {
+            let message = "Email ID / Password field is empty.".to_string();
+            return Err(Box::new(ProfileException(message)))
+        }
+
+        self.id = Some(id);
+        self.password = Some(password);
+
         Ok(())
     }
 
+    /// Apply changes in Settings.toml file to the scheduler
+    /// during the runtime.
     pub fn update_scheduler(&mut self) -> Result<(), Exception> {
         let config = load_config()?;
         self.update_time(&config)?;
@@ -208,6 +234,11 @@ impl Scheduler {
         self.update_profile(&config)?;
 
         Ok(())
+    }
+
+    /// Keyword getter.
+    pub fn keyword<'a>(&'a self) -> &'a HashSet<String> {
+        &self.keyword
     }
 
     pub fn is_now(&mut self) -> bool {
