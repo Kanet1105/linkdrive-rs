@@ -11,7 +11,7 @@ pub struct TimeFormatException((String, String));
 
 impl Debug for TimeFormatException {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        let mut buffer = format!(
+        let buffer = format!(
             "\n\t{}\n\
             \ttime = {} is not a valid time format.\n\
             \ttime = 'HH:MM' is the valid format.",
@@ -23,7 +23,7 @@ impl Debug for TimeFormatException {
 
 impl Display for TimeFormatException {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        let mut buffer = format!(
+        let buffer = format!(
             "\n\t{}\n\
             \ttime = {} is not a valid time format.\n\
             \ttime = 'HH:MM' is the valid format.",
