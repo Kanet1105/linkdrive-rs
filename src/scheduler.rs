@@ -113,6 +113,8 @@ pub struct Scheduler {
     id: Option<String>,
     password: Option<String>,
     buffer: RwLock<Writer<File>>,
+    did_search: bool,
+    did_send: bool,
 }
 
 impl Default for Scheduler {
@@ -128,6 +130,10 @@ impl Default for Scheduler {
             id: None,
             password: None,
             buffer: RwLock::new(buffer),
+            // Set to true if crawler did a search.
+            did_search: false,
+            // Set to true if an email is sent.
+            did_send: false,
         }
     }
 }
@@ -212,7 +218,7 @@ impl Scheduler {
 
         // Set an email
         let email: String = table
-            .get("keyword").unwrap()
+            .get("email").unwrap()
             .to_string();
         self.email = email;
 
@@ -250,13 +256,6 @@ impl Scheduler {
         local.naive_local().to_string()
     }
 
-    fn file_name_by_date(&self) -> String {
-        let local = Local::now();
-        let mut date = local.date_naive().to_string();
-        date.push_str(".csv");
-        date
-    }
-
     /// Apply changes in Settings.toml file to the scheduler
     /// during the runtime.
     pub fn update_scheduler(&mut self) -> Result<(), Exception> {
@@ -274,9 +273,25 @@ impl Scheduler {
         &self.keyword
     }
 
+    pub fn set_did_search(&mut self) {
+        self.did_search = true;
+    }
+
+    pub fn get_did_search(&self) -> bool {
+        self.did_search
+    }
+
     /// Set the alarm off.
     pub fn is_now(&mut self) -> bool {
         let local = Local::now();
+
+        // Reset every send_flag to false at midnight.
+        if local.weekday() != self.weekday {
+            self.did_search = false;
+            self.did_send = false;
+        }
+
+        // Check whether it is time to send an email.
         if local.weekday() == self.weekday && local.hour() == self.hour && local.minute() == self.minute {
             true
         } else {
@@ -285,10 +300,10 @@ impl Scheduler {
     }
 
     /// Write the paper to a file.
-    pub fn write(&mut self, paper: &Paper) -> Result<(), Exception> {
-        let paper = paper.clone();
+    pub fn write(&self, paper: Paper) -> Result<(), Exception> {
         let mut writer = self.buffer.write().unwrap();
         writer.serialize(paper)?;
+        writer.flush()?;
 
         Ok(())
     }
@@ -301,14 +316,18 @@ impl Scheduler {
     }
 
     /// Send an email.
-    pub fn send_email(&mut self) -> Result<(), Exception> { 
+    pub fn send_email(&mut self) -> Result<(), Exception> {
+        if self.did_send {
+            return Ok(())
+        }
+
         // Set credentials for SMTP protocol.
         let id = self.id.clone().unwrap();
         let password = self.password.clone().unwrap();
         let credentials = Credentials::new(id.to_string(), password);
 
         // Set the csv file.
-        let file_name = self.file_name_by_date();
+        let file_name = "Papers.csv".to_string();
         let file_body = fs::read(load_csv_path()?)?;
         let content_type = ContentType::parse("text/csv")?;
         let attachment = Attachment::new(file_name).body(file_body, content_type);
@@ -333,6 +352,7 @@ impl Scheduler {
             },
             Err(e) => { dbg!(e); },
         }
+        self.did_send = true;
 
         Ok(())
     }

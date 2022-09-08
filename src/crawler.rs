@@ -1,5 +1,5 @@
 use std::ffi::OsString;
-use std::sync::{Arc, RwLock};
+use std::sync::Arc;
 use std::time::Duration;
 
 use headless_chrome::{Browser, Element, LaunchOptionsBuilder, Tab};
@@ -75,8 +75,7 @@ impl ChromeDriver {
 
     /// The function starts searching for result for each keyword, 
     /// parses the html element, filters the result and saves changes.
-    pub fn search(&mut self, scheduler: &mut Scheduler) -> Result<(), Exception> {
-        let new_paper = RwLock::new(Vec::<Paper>::new());
+    pub fn search(&mut self, scheduler: &Scheduler) -> Result<(), Exception> {
         let outer_selector = "#srp-results-list";
         let last_element = format!("#srp-results-list > ol > li:nth-child({})", self.max_indices_per_page);
 
@@ -97,14 +96,9 @@ impl ChromeDriver {
             let li_list = result_list.wait_for_elements("li")?;
 
             // Parallel parse() execution.
-            self.parse(li_list, keyword, &self.domain_string, &new_paper)?;
+            self.parse(li_list, keyword, &self.domain_string, scheduler)?;
         }
         self.storage.update(new_keyword);
-        
-        let paper_guard = new_paper.write().unwrap();
-        for paper in &*paper_guard {
-            scheduler.write(paper)?;
-        }
 
         Ok(())
     }
@@ -115,9 +109,11 @@ impl ChromeDriver {
         item_list: Vec<Element>, 
         keyword: &str, 
         domain: &str,
-        new_paper: &RwLock<Vec<Paper>>,
+        scheduler: &Scheduler,
     ) -> Result<(), Exception> {
         let storage = &self.storage;
+        let scheduler = scheduler;
+
         // Parse items in the list.
         item_list
             .par_iter()
@@ -157,8 +153,7 @@ impl ChromeDriver {
                     
                     // Write to the file.
                     if result {
-                        let mut writer = new_paper.write().unwrap();
-                        writer.push(paper);
+                        scheduler.write(paper).unwrap();
                     }
                 }
             });

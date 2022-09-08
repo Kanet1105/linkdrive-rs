@@ -27,11 +27,13 @@ pub fn run_app() -> Result<(), Exception> {
         match scheduler.update_scheduler() {
             Err(e) => {
                 dbg!(e);
-                std::thread::sleep(std::time::Duration::from_secs(10));
+                std::thread::sleep(std::time::Duration::from_secs(2));
+                continue
             },
             Ok(_) => {
                 functional(&mut web_driver, &mut scheduler)?;
-                std::thread::sleep(std::time::Duration::from_secs(20));
+                std::thread::sleep(std::time::Duration::from_secs(2));
+                continue
             },
         }
     }
@@ -64,10 +66,13 @@ fn functional(
     web_driver: &mut ChromeDriver, 
     scheduler: &mut Scheduler,
 ) -> Result<(), Exception> {
-    web_driver.search(scheduler)?;
+    if !scheduler.get_did_search() {
+        web_driver.search(scheduler)?;
+        scheduler.set_did_search();
+    }
+
     if scheduler.is_now() {
         scheduler.send_email()?;
-        std::thread::sleep(std::time::Duration::from_secs(5));
         scheduler.new_buffer()?;
     }
 
