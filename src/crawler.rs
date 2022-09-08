@@ -1,17 +1,12 @@
-use std::fs::File;
 use std::ffi::OsString;
-use std::sync::{Arc, RwLock};
+use std::sync::Arc;
 use std::time::Duration;
 
 use chrono::prelude::*;
-use csv::Writer;
-
 use headless_chrome::{Browser, Element, LaunchOptionsBuilder, Tab};
 use rayon::prelude::*;
 
-use crate::load_csv_path;
 use crate::Exception;
-use crate::scheduler::Scheduler;
 use crate::storage::{Paper, Storage};
 
 /// # ChromeDriver
@@ -25,16 +20,13 @@ pub struct ChromeDriver {
     base_query_string: String,
     blank_token: String,
     max_indices_per_page: usize,
-    storage: Storage,
-    settings: Scheduler,
-    file_handle: RwLock<Writer<File>>,
+    storage: Arc<Storage>,
 }
 
 impl ChromeDriver {
     /// The function initializes the web driver client with a read-only javascript "Tab" object.
     /// 
-    /// [WARNING]
-    /// 
+    /// # WARNING
     /// Although "Arc<Tab>" seems to be thread-safe, the Tab object is actually a web api call
     /// that returns a shared reference to the current window handle. Javascript Window object
     /// can be mutated at any point without the Rust implementation of interior mutability.
@@ -46,7 +38,6 @@ impl ChromeDriver {
             .build()?;
         let browser = Browser::new(options)?;
         let main_tab = browser.wait_for_initial_tab()?;
-        let file_handle = Writer::from_path(load_csv_path()?)?;
 
         Ok(Self {
             browser,
@@ -55,9 +46,7 @@ impl ChromeDriver {
             base_query_string: "https://www.sciencedirect.com/search?qs=".into(),
             blank_token: "%20".into(),
             max_indices_per_page: 50,
-            storage: Storage::new(),
-            settings: Scheduler::default(),
-            file_handle: RwLock::new(file_handle),
+            storage: Arc::new(Storage::new()),
         })
     }
 
@@ -79,26 +68,22 @@ impl ChromeDriver {
         query.push_str(&search_keyword);
         query.push_str(&format!("&show={}", self.max_indices_per_page));
         query.push_str("&sortBy=date");
-
         Ok(query)
     }
 
     /// The function starts searching for result for each keyword, 
     /// parses the html element, filters the result and saves changes.
     pub fn search(&mut self) -> Result<(), Exception> {
-        // Apply changes in "Settings.toml" file to our search.
-        let alarm_time = self.settings.update_scheduler()?;
-        if !self.is_now(alarm_time) {
-            return Ok(())
-        }
-
         let outer_selector = "#srp-results-list";
         let last_element = format!("#srp-results-list > ol > li:nth-child({})", self.max_indices_per_page);
+        
+        // Update the changes applied to the "Settings.toml" file.
+        self.storage.update_settings()?;
+        let new_keyword = self.storage.keyword_from_settings();
 
         // Scrape the page with initialized query strings.
-        let new_keyword = self.settings.keyword();
-        for keyword in new_keyword {
-            let url = self.query_from_keyword(keyword)?;
+        for keyword in &new_keyword {
+            let url = self.query_from_keyword(&keyword)?;
             self.main_tab
                 .navigate_to(&url)?
                 .wait_until_navigated()?
@@ -112,7 +97,7 @@ impl ChromeDriver {
             let li_list = result_list.wait_for_elements("li")?;
 
             // Parallel parse() execution.
-            self.parse(li_list, keyword, &self.domain_string)?;
+            self.parse(li_list, &keyword, &self.domain_string)?;
         }
         self.storage.update(new_keyword);
 
@@ -120,11 +105,10 @@ impl ChromeDriver {
         let local_time = Local::now()
             .naive_local()
             .to_string();
-        self.settings.send_email(&local_time)?;
+        self.storage.send_email(&local_time)?;
         
         // Get a new file handle.
-        self.new_file_handle()?;
-
+        self.storage.new_file_handle()?;
         Ok(())
     }
 
@@ -135,8 +119,7 @@ impl ChromeDriver {
         keyword: &str, 
         domain: &str,
     ) -> Result<(), Exception> {
-        let storage = &self.storage;
-        let buffer = &self.file_handle;
+        let storage = self.storage.clone();
 
         // Parse items in the list.
         item_list
@@ -177,20 +160,10 @@ impl ChromeDriver {
                     
                     // Write to the file.
                     if result {
-                        let mut writer = buffer.write().unwrap();
-                        writer.serialize(paper).unwrap();
-                        writer.flush().unwrap();
+                        storage.write_to_file(paper).unwrap();
                     }
                 }
             });
-
-        Ok(())
-    }
-
-    fn new_file_handle(&mut self) -> Result<(), Exception> {
-        let new_handle = Writer::from_path(load_csv_path()?)?;
-        self.file_handle = RwLock::new(new_handle);
-
         Ok(())
     }
 
