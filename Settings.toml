@@ -3,20 +3,20 @@
 keyword = ["ai", "supply chain"]
 
 # The recipient.
-email = "zombiedelah@gmail.com"
+email = ""
 
 # Choose a weekday to send an email on.
 # ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]
 # 
 #     [Warning] Do not choose more than one value from the above list!
 # 
-weekday = "Wed"
+weekday = "Thu"
 
 # Choose a time to send an email on. 
 #
 #     [Warning] Do not choose more than one value as a time!
 #
-time = "17:21"
+time = "15:43"
 
 [profile]
 id = ""
