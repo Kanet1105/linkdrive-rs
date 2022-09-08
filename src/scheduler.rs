@@ -1,104 +1,16 @@
 use std::collections::HashSet;
 use std::error::Error;
 use std::fmt::{Debug, Display};
-use std::fs::{self, File};
-use std::sync::RwLock;
+use std::fs;
 
 use chrono::prelude::*;
 use config::{self, Config};
-use csv::Writer;
 use lettre::{Message, SmtpTransport, Transport};
 use lettre::message::{header::ContentType, Attachment};
 use lettre::transport::smtp::authentication::Credentials;
 
 use crate::{load_config, load_csv_path};
 use crate::Exception;
-use crate::storage::Paper;
-
-pub struct TimeFormatException((String, String));
-
-impl Debug for TimeFormatException {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        let buffer = format!(
-            "\n\t{}\n\
-            \ttime = {} is not a valid time format.\n\
-            \ttime = 'HH:MM' is the valid format.",
-            &self.0.0, &self.0.1
-        );
-        write!(f, "{}", buffer)
-    }
-}
-
-impl Display for TimeFormatException {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        let buffer = format!(
-            "\n\t{}\n\
-            \ttime = {} is not a valid time format.\n\
-            \ttime = 'HH:MM' is the valid format.",
-            &self.0.0, &self.0.1
-        );
-        write!(f, "{}", buffer)
-    }
-}
-
-impl Error for TimeFormatException {}
-
-pub struct WeekdayException(String);
-
-impl Debug for WeekdayException {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, 
-            "\n\tweekday = '{}' is not a valid weekday format.\nChoose from\n\
-            \t'Mon'\n\
-            \t'Tue'\n\
-            \t'Wed'\n\
-            \t'Thu'\n\
-            \t'Fri'\n\
-            \t'Sat'\n\
-            \t'Sun'\n",
-            &self.0
-        )
-    }
-}
-
-impl Display for WeekdayException {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, 
-            "\n\tweekday = '{}' is not a valid weekday format.\nChoose from\n\
-            \t'Mon'\n\
-            \t'Tue'\n\
-            \t'Wed'\n\
-            \t'Thu'\n\
-            \t'Fri'\n\
-            \t'Sat'\n\
-            \t'Sun'\n",
-            &self.0
-        )
-    }
-}
-
-pub struct ProfileException(String);
-
-impl Debug for ProfileException {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "\n\t{}", &self.0)
-    }
-}
-
-impl Display for ProfileException {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "\n\t{}", &self.0)
-    }
-}
-
-impl Error for ProfileException {}
-
-pub enum UnitTime {
-    Hour,
-    Minute,
-}
-
-impl Error for WeekdayException {}
 
 /// Scheduler struct.
 /// 
@@ -112,15 +24,10 @@ pub struct Scheduler {
     email: String,
     id: Option<String>,
     password: Option<String>,
-    buffer: RwLock<Writer<File>>,
-    did_search: bool,
-    did_send: bool,
 }
 
 impl Default for Scheduler {
     fn default() -> Self {
-        let buffer = Writer::from_path(load_csv_path().unwrap()).unwrap();
-
         Self {
             hour: 8,
             minute: 0,
@@ -129,11 +36,6 @@ impl Default for Scheduler {
             email: String::new(),
             id: None,
             password: None,
-            buffer: RwLock::new(buffer),
-            // Set to true if crawler did a search.
-            did_search: false,
-            // Set to true if an email is sent.
-            did_send: false,
         }
     }
 }
@@ -251,21 +153,16 @@ impl Scheduler {
         Ok(())
     }
 
-    fn local_naive_time(&self) -> String {
-        let local = Local::now();
-        local.naive_local().to_string()
-    }
-
     /// Apply changes in Settings.toml file to the scheduler
     /// during the runtime.
-    pub fn update_scheduler(&mut self) -> Result<(), Exception> {
+    pub fn update_scheduler(&mut self) -> Result<(u32, u32, Weekday), Exception> {
         let config = load_config()?;
         self.update_time(&config)?;
         self.update_weekday(&config)?;
         self.update_keyword_and_email(&config)?;
         self.update_profile(&config)?;
 
-        Ok(())
+        Ok(self.alarm_time())
     }
 
     /// Keyword getter.
@@ -273,40 +170,13 @@ impl Scheduler {
         &self.keyword
     }
 
-    /// Set the alarm off.
-    pub fn is_now(&mut self) -> bool {
-        let local = Local::now();
-        if local.weekday() == self.weekday && local.hour() == self.hour && local.minute() == self.minute {
-            self.did_search = false;
-            self.did_send = false;
-            true
-        } else {
-            false
-        }
-    }
-
-    /// Write the paper to a file.
-    pub fn write(&self, paper: Paper) -> Result<(), Exception> {
-        let mut writer = self.buffer.write().unwrap();
-        writer.serialize(paper)?;
-        writer.flush()?;
-
-        Ok(())
-    }
-
-    pub fn new_buffer(&mut self) -> Result<(), Exception> {
-        let new_buffer = Writer::from_path(load_csv_path()?)?;
-        self.buffer = RwLock::new(new_buffer);
-
-        Ok(())
+    /// Alarm time getter.
+    pub fn alarm_time(&self) -> (u32, u32, Weekday) {
+        (self.hour, self.minute, self.weekday.clone())
     }
 
     /// Send an email.
-    pub fn send_email(&mut self) -> Result<(), Exception> {
-        if self.did_send {
-            return Ok(())
-        }
-
+    pub fn send_email(&mut self, local_time: &str) -> Result<(), Exception> {
         // Set credentials for SMTP protocol.
         let id = self.id.clone().unwrap();
         let password = self.password.clone().unwrap();
@@ -333,13 +203,96 @@ impl Scheduler {
 
         match mailer.send(&message) {
             Ok(_) => {
-                let ts = self.local_naive_time();
-                println!("Message sent at [{}]", ts);
+                println!("Message sent at [{}]", local_time);
             },
             Err(e) => { dbg!(e); },
         }
-        self.did_send = true;
-
+        
         Ok(())
     }
+}
+
+pub struct TimeFormatException((String, String));
+
+impl Debug for TimeFormatException {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let buffer = format!(
+            "\n\t{}\n\
+            \ttime = {} is not a valid time format.\n\
+            \ttime = 'HH:MM' is the valid format.",
+            &self.0.0, &self.0.1
+        );
+        write!(f, "{}", buffer)
+    }
+}
+
+impl Display for TimeFormatException {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let buffer = format!(
+            "\n\t{}\n\
+            \ttime = {} is not a valid time format.\n\
+            \ttime = 'HH:MM' is the valid format.",
+            &self.0.0, &self.0.1
+        );
+        write!(f, "{}", buffer)
+    }
+}
+
+impl Error for TimeFormatException {}
+
+pub struct WeekdayException(String);
+
+impl Debug for WeekdayException {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, 
+            "\n\tweekday = '{}' is not a valid weekday format.\nChoose from\n\
+            \t'Mon'\n\
+            \t'Tue'\n\
+            \t'Wed'\n\
+            \t'Thu'\n\
+            \t'Fri'\n\
+            \t'Sat'\n\
+            \t'Sun'\n",
+            &self.0
+        )
+    }
+}
+
+impl Display for WeekdayException {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, 
+            "\n\tweekday = '{}' is not a valid weekday format.\nChoose from\n\
+            \t'Mon'\n\
+            \t'Tue'\n\
+            \t'Wed'\n\
+            \t'Thu'\n\
+            \t'Fri'\n\
+            \t'Sat'\n\
+            \t'Sun'\n",
+            &self.0
+        )
+    }
+}
+
+impl Error for WeekdayException {}
+
+pub struct ProfileException(String);
+
+impl Debug for ProfileException {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "\n\t{}", &self.0)
+    }
+}
+
+impl Display for ProfileException {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "\n\t{}", &self.0)
+    }
+}
+
+impl Error for ProfileException {}
+
+pub enum UnitTime {
+    Hour,
+    Minute,
 }

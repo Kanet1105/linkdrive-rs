@@ -4,38 +4,26 @@ mod storage;
 
 use std::env::current_dir;
 use std::path::PathBuf;
+use std::thread::sleep;
+use std::time::Duration;
 
+use chrono::prelude::*;
 use config::{self, Config};
 
 use crawler::ChromeDriver;
-use scheduler::Scheduler;
 
 /// Type aliasing for Box<dyn std::error::Error> that is used globally.
 pub type Exception = Box<dyn std::error::Error>;
 
 /// The entry point of the app.
 pub fn run_app() -> Result<(), Exception> {
-    // Initialize the default scheduler as a mutable reference.
-    let mut scheduler = Scheduler::default();
+    let mut flag = true;
+    // Initialize the crawler as a mutable reference.
+    let mut crawler = ChromeDriver::new()?;
 
-    // Initialize the Chrome web driver as a mutable reference.
-    let mut web_driver = ChromeDriver::new()?;
-
-    // Apply any changes made to "Settings.toml" in a loop.
     loop {
-        // Update the scheduler and search.
-        match scheduler.update_scheduler() {
-            Err(e) => {
-                dbg!(e);
-                std::thread::sleep(std::time::Duration::from_secs(2));
-                continue
-            },
-            Ok(_) => {
-                functional(&mut web_driver, &mut scheduler)?;
-                std::thread::sleep(std::time::Duration::from_secs(2));
-                continue
-            },
-        }
+        crawler.search()?;
+        sleep(Duration::from_secs(2));
     }
 }
 
@@ -62,15 +50,13 @@ fn load_csv_path() -> Result<PathBuf, Exception> {
     Ok(csv_path)
 }
 
-fn functional(
-    web_driver: &mut ChromeDriver, 
-    scheduler: &mut Scheduler,
-) -> Result<(), Exception> {
-    if scheduler.is_now() {
-        web_driver.search(scheduler)?;
-        scheduler.send_email()?;
-        scheduler.new_buffer()?;
+/// Set the alarm off.
+fn is_now(alarm_time: (u32, u32, Weekday)) -> bool {
+    let local = Local::now();
+    let (h, m, w) = alarm_time;
+    if local.weekday() == w && local.hour() == h && local.minute() == m {
+        true
+    } else {
+        false
     }
-
-    Ok(())
 }
