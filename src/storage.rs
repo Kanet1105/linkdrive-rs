@@ -1,4 +1,5 @@
 use std::collections::{HashMap, HashSet};
+use std::env;
 use std::error::Error;
 use std::fmt::{Debug, Display};
 use std::fs::{self, File};
@@ -12,7 +13,7 @@ use lettre::{Message, SmtpTransport, Transport};
 use lettre::message::{header::ContentType, Attachment};
 use lettre::transport::smtp::authentication::Credentials;
 
-use crate::{load_config, load_csv_path};
+use crate::load_csv_path;
 use crate::Exception;
 
 pub struct Storage {
@@ -150,7 +151,7 @@ pub struct Settings {
     pub minute: u32,
     pub weekday: Weekday,
     id: String,
-    password: String,
+    mailer: Option<SmtpTransport>,
 }
 
 impl Settings {
@@ -162,16 +163,32 @@ impl Settings {
             minute: 30,
             weekday: Weekday::Sun,
             id: "".into(),
-            password: "".into(),
+            mailer: None,
         };
         me.update_settings()?;
         Ok(me)
     }
 
+    /// Load configurations from the Settings.toml file located at
+    /// the program root directory.
+    pub fn load_config(&self) -> Result<Config, Exception> {
+        // The base path for configs ("./Settings.toml").
+        let mut settings_path = env::current_dir()?;
+        settings_path.push("Settings.toml");
+        let settings_path_str = settings_path.to_str().unwrap();
+
+        // Build the config file.
+        let config = Config::builder()
+            .add_source(config::File::with_name(settings_path_str))
+            .add_source(config::Environment::with_prefix("APP"))
+            .build()?;
+        Ok(config)
+    }
+
     /// Apply changes in Settings.toml file to the scheduler
     /// during the runtime.
     pub fn update_settings(&mut self) -> Result<(), Exception> {
-        let config = load_config()?;
+        let config = self.load_config()?;
         self.update_keyword(&config)?;
         self.update_email(&config)?;
         self.update_time(&config)?;
@@ -315,19 +332,23 @@ impl Settings {
             let message = "Email ID / Password field is empty.".to_string();
             return Err(Box::new(ProfileException(message)))
         }
+
+        if self.mailer.is_none() {
+            // Set credentials for SMTP protocol.
+            let credentials = Credentials::new(id.to_string(), password.to_string());
+
+            // Open a remote connection to naver SMTP server.
+            self.mailer = Some(SmtpTransport::relay("smtp.naver.com")?
+                .credentials(credentials)
+                .build());
+        }
+
         self.id = id;
-        self.password = password;
         Ok(())
     }
 
     /// Send an email.
     fn send_email(&self, local_time: &str) -> Result<(), Exception> {
-        // Set credentials for SMTP protocol.
-        let credentials = Credentials::new(
-            self.id.to_string(), 
-            self.password.to_string()
-        );
-
         // Set the csv file.
         let file_name = "Papers.csv".to_string();
         let file_body = fs::read(load_csv_path()?)?;
@@ -342,11 +363,7 @@ impl Settings {
             .subject("SMTP Test")
             .singlepart(attachment)?;
 
-        // Open a remote connection to naver SMTP server.
-        let mailer = SmtpTransport::relay("smtp.naver.com")?
-            .credentials(credentials)
-            .build();
-
+        let mailer = self.mailer.as_ref().unwrap();
         match mailer.send(&message) {
             Ok(_) => {
                 println!("Message sent at [{}]", local_time);
