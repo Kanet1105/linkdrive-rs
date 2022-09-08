@@ -258,19 +258,6 @@ impl Scheduler {
         local.naive_local().to_string()
     }
 
-    /// Update the flag to set 
-    /// - self.did_search -> false
-    /// - self.did_send -> false
-    /// to make the main module functional again.
-    pub fn update_flag(&mut self) {
-        let today = Local::now().weekday();
-        if today != self.flag {
-            self.did_search = false;
-            self.did_send = false;
-        }
-        self.flag = today;
-    }
-
     /// Apply changes in Settings.toml file to the scheduler
     /// during the runtime.
     pub fn update_scheduler(&mut self) -> Result<(), Exception> {
@@ -279,7 +266,6 @@ impl Scheduler {
         self.update_weekday(&config)?;
         self.update_keyword_and_email(&config)?;
         self.update_profile(&config)?;
-        self.update_flag();
 
         Ok(())
     }
