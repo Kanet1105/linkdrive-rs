@@ -99,7 +99,6 @@ impl ChromeDriver {
         let new_keyword = self.settings.keyword();
         for keyword in new_keyword {
             let url = self.query_from_keyword(keyword)?;
-            dbg!(&url);
             self.main_tab
                 .navigate_to(&url)?
                 .wait_until_navigated()?
