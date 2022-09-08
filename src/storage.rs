@@ -16,7 +16,7 @@ use crate::{load_config, load_csv_path};
 use crate::Exception;
 
 pub struct Storage {
-    keyword: HashSet<String>,
+    keyword: RwLock<HashSet<String>>,
     storage: RwLock<HashMap<String, Paper>>,
     up_storage: RwLock<HashMap<String, Paper>>,
     settings: RwLock<Settings>,
@@ -32,7 +32,7 @@ impl Storage {
         let file_handle = Writer::from_path(load_csv_path().unwrap()).unwrap();
 
         Self {
-            keyword,
+            keyword: RwLock::new(keyword),
             storage: RwLock::new(storage),
             up_storage: RwLock::new(up_storage),
             settings: RwLock::new(settings),
@@ -51,12 +51,13 @@ impl Storage {
     pub fn insert(&self, key: (String, String), value: Paper) -> bool {
         let (keyword, href) = key;
         let mut writer = self.up_storage.write().unwrap();
-        writer.insert(href.to_string(), value);
+        writer.insert(href.to_string(), value.clone());
 
         // Only write to the file when the keyword has already been added,
         // but the paper by the key is not in the hashmap.
-        if !self.contains_key(&href) && !self.keyword.contains(&keyword) {
-            true // Write to the file when it returns true.
+        let reader = self.keyword.read().unwrap();
+        if !self.contains_key(&href) && !reader.contains(&keyword) {
+            true
         } else {
             false
         }
@@ -64,15 +65,33 @@ impl Storage {
 
     /// Utilizes [std::mem::take] and [std::mem::replace] to replace the 
     /// current value with the new value.
-    pub fn update(&mut self, new_keyword: HashSet<String>) {
-        self.keyword = new_keyword;
-        let updated_storage = mem::take(&mut self.up_storage);
-        let _ = mem::replace(&mut self.storage, updated_storage);
+    pub fn update(&self, new_keyword: HashSet<String>) {
+        let _ = mem::replace(
+            &mut *self.keyword.write().unwrap(), 
+            new_keyword
+        );
+
+        let new_storage = mem::take(&mut *self.up_storage.write().unwrap());
+        let _ = mem::replace(
+            &mut *self.storage.write().unwrap(), 
+            new_storage,
+        );
+    }
+
+    /// Utilizes [std::mem::replace] to replace the current file handle
+    /// with the new one after sending an email.
+    pub fn new_file_handle(&self) -> Result<(), Exception> {
+        let new_file = Writer::from_path(load_csv_path()?)?;
+        let _ = mem::replace(
+            &mut *self.file_handle.write().unwrap(), 
+            new_file
+        );
+        Ok(())
     }
 
     /// Update the changes applied to the "Settings.toml" file.
     pub fn update_settings(&self) -> Result<(), Exception> {
-        let writer = self.settings.write().unwrap();
+        let mut writer = self.settings.write().unwrap();
         writer.update_settings()?;
         Ok(())
     }
@@ -83,9 +102,15 @@ impl Storage {
     }
 
     pub fn write_to_file(&self, paper: Paper) -> Result<(), Exception> {
-        let writer = self.file_handle.write().unwrap();
+        let mut writer = self.file_handle.write().unwrap();
         writer.serialize(paper)?;
         writer.flush()?;
+        Ok(())
+    }
+
+    pub fn send_email(&self, local_time: &str) -> Result<(), Exception> {
+        let writer = self.settings.write().unwrap();
+        writer.send_email(local_time)?;
         Ok(())
     }
 }
@@ -125,7 +150,6 @@ pub struct Settings {
 
 impl Settings {
     pub fn new() -> Result<Self, Exception> {
-        let config = load_config()?;
         let mut me = Self {
             keyword: HashSet::<String>::new(),
             email: String::new(),
