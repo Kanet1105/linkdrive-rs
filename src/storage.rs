@@ -1,13 +1,16 @@
 use std::collections::{HashMap, HashSet};
 use std::error::Error;
 use std::fmt::{Debug, Display};
-use std::fs::File;
+use std::fs::{self, File};
 use std::mem;
 use std::sync::RwLock;
 
 use chrono::prelude::*;
 use config::Config;
 use csv::Writer;
+use lettre::{Message, SmtpTransport, Transport};
+use lettre::message::{header::ContentType, Attachment};
+use lettre::transport::smtp::authentication::Credentials;
 
 use crate::{load_config, load_csv_path};
 use crate::Exception;
@@ -285,6 +288,42 @@ impl Settings {
         }
         self.id = id;
         self.password = password;
+        Ok(())
+    }
+
+    /// Send an email.
+    fn send_email(&self, local_time: &str) -> Result<(), Exception> {
+        // Set credentials for SMTP protocol.
+        let credentials = Credentials::new(
+            self.id.to_string(), 
+            self.password.to_string()
+        );
+
+        // Set the csv file.
+        let file_name = "Papers.csv".to_string();
+        let file_body = fs::read(load_csv_path()?)?;
+        let content_type = ContentType::parse("text/csv")?;
+        let attachment = Attachment::new(file_name).body(file_body, content_type);
+        
+        // Build the message block.
+        let email = self.email.clone();
+        let message = Message::builder()
+            .from(format!("Crawler <{}@naver.com>", id).parse().unwrap())
+            .to(email.parse().unwrap())
+            .subject("SMTP Test")
+            .singlepart(attachment)?;
+
+        // Open a remote connection to naver SMTP server.
+        let mailer = SmtpTransport::relay("smtp.naver.com")?
+            .credentials(credentials)
+            .build();
+
+        match mailer.send(&message) {
+            Ok(_) => {
+                println!("Message sent at [{}]", local_time);
+            },
+            Err(e) => { dbg!(e); },
+        }
         Ok(())
     }
 }
