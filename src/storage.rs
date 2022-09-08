@@ -1,11 +1,13 @@
 use std::collections::{HashMap, HashSet};
 use std::error::Error;
 use std::fmt::{Debug, Display};
+use std::fs::File;
 use std::mem;
 use std::sync::RwLock;
 
 use chrono::prelude::*;
 use config::Config;
+use csv::Writer;
 
 use crate::{load_config, load_csv_path};
 use crate::Exception;
@@ -15,6 +17,7 @@ pub struct Storage {
     storage: RwLock<HashMap<String, Paper>>,
     up_storage: RwLock<HashMap<String, Paper>>,
     settings: RwLock<Settings>,
+    file_handle: RwLock<Writer<File>>,
 }
 
 impl Storage {
@@ -23,12 +26,14 @@ impl Storage {
         let storage = HashMap::<String, Paper>::new();
         let up_storage = HashMap::<String, Paper>::new();
         let settings = Settings::new().unwrap();
+        let file_handle = Writer::from_path(load_csv_path().unwrap()).unwrap();
 
         Self {
             keyword,
             storage: RwLock::new(storage),
             up_storage: RwLock::new(up_storage),
             settings: RwLock::new(settings),
+            file_handle: RwLock::new(file_handle),
         }
     }
     
@@ -56,10 +61,29 @@ impl Storage {
 
     /// Utilizes [std::mem::take] and [std::mem::replace] to replace the 
     /// current value with the new value.
-    pub fn update(&mut self, new_keyword: &HashSet<String>) {
-        self.keyword = new_keyword.clone();
+    pub fn update(&mut self, new_keyword: HashSet<String>) {
+        self.keyword = new_keyword;
         let updated_storage = mem::take(&mut self.up_storage);
         let _ = mem::replace(&mut self.storage, updated_storage);
+    }
+
+    /// Update the changes applied to the "Settings.toml" file.
+    pub fn update_settings(&self) -> Result<(), Exception> {
+        let writer = self.settings.write().unwrap();
+        writer.update_settings()?;
+        Ok(())
+    }
+
+    pub fn keyword_from_settings(&self) -> HashSet<String> {
+        let reader = self.settings.read().unwrap();
+        reader.keyword.clone()
+    }
+
+    pub fn write_to_file(&self, paper: Paper) -> Result<(), Exception> {
+        let writer = self.file_handle.write().unwrap();
+        writer.serialize(paper)?;
+        writer.flush()?;
+        Ok(())
     }
 }
 
@@ -87,11 +111,11 @@ impl Debug for Paper {
 /// id and password are no longer optional fields. They
 /// need to be filled out in order to use the program.
 pub struct Settings {
-    keyword: HashSet<String>,
-    email: String,
-    hour: u32,
-    minute: u32,
-    weekday: Weekday,
+    pub keyword: HashSet<String>,
+    pub email: String,
+    pub hour: u32,
+    pub minute: u32,
+    pub weekday: Weekday,
     id: String,
     password: String,
 }
@@ -109,7 +133,6 @@ impl Settings {
             password: "".into(),
         };
         me.update_settings()?;
-        
         Ok(me)
     }
 
@@ -122,7 +145,6 @@ impl Settings {
         self.update_time(&config)?;
         self.update_weekday(&config)?;
         self.update_profile(&config)?;
-
         Ok(())
     }
 
@@ -148,7 +170,6 @@ impl Settings {
             .map(|x| { x.to_string() })
             .collect();
         self.keyword = keyword;
-
         Ok(())
     }
 
@@ -162,7 +183,6 @@ impl Settings {
             .get("email").unwrap()
             .to_string();
         self.email = email;
-
         Ok(())
     }
 
@@ -190,7 +210,6 @@ impl Settings {
         let (hh, mm) = alarm_time.split_once(':').unwrap();
         self.hour = self.parse_time(hh, UnitTime::Hour)?;
         self.minute = self.parse_time(mm, UnitTime::Minute)?;
-
         Ok(())
     }
 
@@ -237,7 +256,6 @@ impl Settings {
             "Sun" => Ok(Weekday::Sun),
             _ => Err(Box::new(WeekdayException(weekday_value))),
         }?;
-
         Ok(())
     }
 
@@ -257,7 +275,6 @@ impl Settings {
             let password: String = table
                 .get("password").unwrap()
                 .to_string();
-            
             (id, password)
         };
         
@@ -268,7 +285,6 @@ impl Settings {
         }
         self.id = id;
         self.password = password;
-
         Ok(())
     }
 }
