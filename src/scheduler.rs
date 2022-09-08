@@ -115,7 +115,6 @@ pub struct Scheduler {
     buffer: RwLock<Writer<File>>,
     did_search: bool,
     did_send: bool,
-    flag: Weekday,
 }
 
 impl Default for Scheduler {
@@ -135,7 +134,6 @@ impl Default for Scheduler {
             did_search: false,
             // Set to true if an email is sent.
             did_send: false,
-            flag: Weekday::Sun,
         }
     }
 }
