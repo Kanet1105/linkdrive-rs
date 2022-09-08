@@ -6,9 +6,6 @@ use std::env::current_dir;
 use std::path::PathBuf;
 
 use config::{self, Config};
-use lettre::{Message, SmtpTransport, Transport};
-use lettre::message::{header::ContentType, Attachment};
-use lettre::transport::smtp::authentication::Credentials;
 
 use crawler::ChromeDriver;
 use scheduler::Scheduler;
@@ -29,14 +26,14 @@ pub fn run_app() -> Result<(), Exception> {
         // Update the scheduler and search.
         match scheduler.update_scheduler() {
             Err(e) => {
-                dbg!(e); 
-                continue
+                dbg!(e);
+                std::thread::sleep(std::time::Duration::from_secs(10));
             },
             Ok(_) => {
-                web_driver.search(&scheduler)?;
+                functional(&mut web_driver, &mut scheduler)?;
+                std::thread::sleep(std::time::Duration::from_secs(20));
             },
         }
-        std::thread::sleep(std::time::Duration::from_secs(60));
     }
 }
 
@@ -63,70 +60,16 @@ fn load_csv_path() -> Result<PathBuf, Exception> {
     Ok(csv_path)
 }
 
-// fn send_email(id: &str, password: &str, email: &str) -> Result<(), Exception> {
-//     // Set credentials for the SMTP server.
-//     let creds = Credentials::new(id.to_string(), password.to_string());
+fn functional(
+    web_driver: &mut ChromeDriver, 
+    scheduler: &mut Scheduler,
+) -> Result<(), Exception> {
+    web_driver.search(scheduler)?;
+    if scheduler.is_now() {
+        scheduler.send_email()?;
+        std::thread::sleep(std::time::Duration::from_secs(5));
+        scheduler.new_buffer()?;
+    }
 
-//     // Set the csv file to send.
-//     let file_name = "Papers.csv".to_string();
-//     let file_body = fs::read(csv_path("Papers.csv")?)?;
-//     let content_type = ContentType::parse("text/csv")?;
-//     let attachment = Attachment::new(file_name).body(file_body, content_type);
-
-//     // Build the message block.
-//     let mut message = Message::builder()
-//         .from(format!("Dongjae Park <{}@naver.com>", id).parse().unwrap())
-//         .to(email.parse().unwrap())
-//         .subject("SMTP Test")
-//         .singlepart(attachment)
-//         .unwrap();
-
-//     // Open a remote connection to naver SMTP server.
-//     let mailer = SmtpTransport::relay("smtp.naver.com")
-//         .unwrap()
-//         .credentials(creds)
-//         .build();
-
-//     // Send the email
-//     match mailer.send(&message) {
-//         Ok(_) => println!("Email sent successfully!"),
-//         Err(e) => panic!("Could not send email: {:?}", e),
-//     }
-
-//     Ok(())
-// }
-
-// #[test]
-// fn send_email_test() {
-//     let id = value_to_string("profile", "id").unwrap();
-//     let password = value_to_string("profile", "password").unwrap();
-
-//     // let keyword = value_to_vec("default", "keyword").unwrap();
-//     let email = value_to_string("default", "email").unwrap();
-
-//     let file_name = "Papers.csv".to_string();
-//     let file_body = fs::read("D:\\RustProjects\\linkdrive-rs\\Papers.csv").unwrap();
-//     let content_type = ContentType::parse("text/csv").unwrap();
-//     let attachment = Attachment::new(file_name).body(file_body, content_type);
-
-//     let email = Message::builder()
-//         .from(format!("Donghoon Lee <{}@naver.com>", &id).parse().unwrap())
-//         .to(email.parse().unwrap())
-//         .subject("Multiple Receivers Test")
-//         .singlepart(attachment)
-//         .unwrap();
-
-//     let creds = Credentials::new(id, password);
-
-//     // Open a remote connection to gmail
-//     let mailer = SmtpTransport::relay("smtp.naver.com")
-//         .unwrap()
-//         .credentials(creds)
-//         .build();
-
-//     // Send the email
-//     match mailer.send(&email) {
-//         Ok(_) => println!("Email sent successfully!"),
-//         Err(e) => panic!("Could not send email: {:?}", e),
-//     }
-// }
+    Ok(())
+}
