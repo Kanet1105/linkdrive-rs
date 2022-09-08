@@ -308,7 +308,7 @@ impl Settings {
         // Build the message block.
         let email = self.email.clone();
         let message = Message::builder()
-            .from(format!("Crawler <{}@naver.com>", id).parse().unwrap())
+            .from(format!("Crawler <{}@naver.com>", &self.id).parse().unwrap())
             .to(email.parse().unwrap())
             .subject("SMTP Test")
             .singlepart(attachment)?;
