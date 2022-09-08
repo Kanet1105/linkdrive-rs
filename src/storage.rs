@@ -101,6 +101,11 @@ impl Storage {
         reader.keyword.clone()
     }
 
+    pub fn time_from_settings(&self) -> (u32, u32, Weekday) {
+        let reader = self.settings.read().unwrap();
+        (reader.hour, reader.minute, reader.weekday)
+    }
+
     pub fn write_to_file(&self, paper: Paper) -> Result<(), Exception> {
         let mut writer = self.file_handle.write().unwrap();
         writer.serialize(paper)?;
