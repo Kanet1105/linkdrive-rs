@@ -77,11 +77,8 @@ impl ChromeDriver {
         let outer_selector = "#srp-results-list";
         let last_element = format!("#srp-results-list > ol > li:nth-child({})", self.max_indices_per_page);
         
-        // Update the changes applied to the "Settings.toml" file.
-        self.storage.update_settings()?;
-        let new_keyword = self.storage.keyword_from_settings();
-
         // Scrape the page with initialized query strings.
+        let new_keyword = self.storage.keyword_from_settings();
         for keyword in &new_keyword {
             let url = self.query_from_keyword(&keyword)?;
             self.main_tab
@@ -167,18 +164,18 @@ impl ChromeDriver {
         Ok(())
     }
 
-    fn is_now(&self, alarm_time: (u32, u32, Weekday)) -> bool {
-        let (h, m, wd) = alarm_time;
-
+    fn local_now(&self) -> (u32, u32, Weekday) {
         let local = Local::now();
-        let hour = local.hour();
-        let minute = local.minute();
-        let weekday = local.weekday();
-        
-        if hour == h && minute == m && weekday == wd {
-            true
-        } else {
-            false
-        }
+        (local.hour(), local.minute(), local.weekday())
+    }
+
+    pub fn is_now(&self) -> Result<bool, Exception> {
+        // helps to soft-land changes in the "Settings.toml file".
+        self.storage.update_settings()?;
+
+        // Compare local time with the event time.
+        let local_time = self.local_now();
+        let time_set = self.storage.time_from_settings();
+        Ok(local_time == time_set)
     }
 }
