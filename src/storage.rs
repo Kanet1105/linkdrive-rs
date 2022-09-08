@@ -1,19 +1,12 @@
 use std::collections::{HashMap, HashSet};
 use std::fmt::Debug;
-use std::fs::File;
 use std::mem;
 use std::sync::RwLock;
-
-use csv::Writer;
-
-use crate::Exception;
-use crate::load_csv_path;
 
 pub struct Storage {
     keyword: HashSet<String>,
     storage: RwLock<HashMap<String, Paper>>,
     up_storage: RwLock<HashMap<String, Paper>>,
-    buffer: RwLock<Writer<File>>,
 }
 
 impl Storage {
@@ -21,13 +14,11 @@ impl Storage {
         let keyword = HashSet::<String>::new();
         let storage = HashMap::<String, Paper>::new();
         let up_storage = HashMap::<String, Paper>::new();
-        let buffer = Writer::from_path(load_csv_path().unwrap()).unwrap();
 
         Self {
             keyword,
             storage: RwLock::new(storage),
             up_storage: RwLock::new(up_storage),
-            buffer: RwLock::new(buffer),
         }
     }
     
@@ -59,14 +50,6 @@ impl Storage {
         self.keyword = new_keyword.clone();
         let updated_storage = mem::take(&mut self.up_storage);
         let _ = mem::replace(&mut self.storage, updated_storage);
-    }
-
-    /// Write the paper to a file.
-    pub fn write(&self, paper: Paper) -> Result<(), Exception> {
-        let mut writer = self.buffer.write().unwrap();
-        writer.serialize(paper)?;
-
-        Ok(())
     }
 }
 

@@ -96,7 +96,7 @@ impl ChromeDriver {
             let li_list = result_list.wait_for_elements("li")?;
 
             // Parallel parse() execution.
-            self.parse(li_list, keyword, &self.domain_string)?;
+            self.parse(li_list, keyword, &self.domain_string, &scheduler)?;
         }
         self.storage.update(new_keyword);
 
@@ -104,8 +104,15 @@ impl ChromeDriver {
     }
 
     /// Multi-threaded parser utilizing ["rayon"].
-    fn parse(&self, item_list: Vec<Element>, keyword: &str, domain: &str) -> Result<(), Exception> {
+    fn parse(
+        &self, 
+        item_list: Vec<Element>, 
+        keyword: &str, 
+        domain: &str, 
+        scheduler: &Scheduler
+    ) -> Result<(), Exception> {
         let storage = &self.storage;
+        let buf_writer = scheduler;
         // Parse items in the list.
         item_list
             .par_iter()
@@ -145,7 +152,7 @@ impl ChromeDriver {
                     
                     // Write to the file.
                     if result {
-                        storage.write(paper).unwrap();
+                        buf_writer.write(paper).unwrap();
                     }
                 }
             });
