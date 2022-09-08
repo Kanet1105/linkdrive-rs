@@ -115,6 +115,7 @@ pub struct Scheduler {
     buffer: RwLock<Writer<File>>,
     did_search: bool,
     did_send: bool,
+    flag: Weekday,
 }
 
 impl Default for Scheduler {
@@ -134,6 +135,7 @@ impl Default for Scheduler {
             did_search: false,
             // Set to true if an email is sent.
             did_send: false,
+            flag: Weekday::Sun,
         }
     }
 }
@@ -197,8 +199,8 @@ impl Scheduler {
             "Sat" => Ok(Weekday::Sat),
             "Sun" => Ok(Weekday::Sun),
             _ => Err(Box::new(WeekdayException(weekday_value))),
-        };
-        self.weekday = weekday?;
+        }?;
+        self.weekday = weekday;
 
         Ok(())
     }
@@ -256,6 +258,19 @@ impl Scheduler {
         local.naive_local().to_string()
     }
 
+    /// Update the flag to set 
+    /// - self.did_search -> false
+    /// - self.did_send -> false
+    /// to make the main module functional again.
+    pub fn update_flag(&mut self) {
+        let today = Local::now().weekday();
+        if today != self.flag {
+            self.did_search = false;
+            self.did_send = false;
+        }
+        self.flag = today;
+    }
+
     /// Apply changes in Settings.toml file to the scheduler
     /// during the runtime.
     pub fn update_scheduler(&mut self) -> Result<(), Exception> {
@@ -264,6 +279,7 @@ impl Scheduler {
         self.update_weekday(&config)?;
         self.update_keyword_and_email(&config)?;
         self.update_profile(&config)?;
+        self.update_flag();
 
         Ok(())
     }
@@ -284,14 +300,6 @@ impl Scheduler {
     /// Set the alarm off.
     pub fn is_now(&mut self) -> bool {
         let local = Local::now();
-
-        // Reset every send_flag to false at midnight.
-        if local.weekday() != self.weekday {
-            self.did_search = false;
-            self.did_send = false;
-        }
-
-        // Check whether it is time to send an email.
         if local.weekday() == self.weekday && local.hour() == self.hour && local.minute() == self.minute {
             true
         } else {
