@@ -66,12 +66,8 @@ fn functional(
     web_driver: &mut ChromeDriver, 
     scheduler: &mut Scheduler,
 ) -> Result<(), Exception> {
-    if !scheduler.get_did_search() {
-        web_driver.search(scheduler)?;
-        scheduler.set_did_search();
-    }
-
     if scheduler.is_now() {
+        web_driver.search(scheduler)?;
         scheduler.send_email()?;
         scheduler.new_buffer()?;
     }

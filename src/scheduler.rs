@@ -289,18 +289,12 @@ impl Scheduler {
         &self.keyword
     }
 
-    pub fn set_did_search(&mut self) {
-        self.did_search = true;
-    }
-
-    pub fn get_did_search(&self) -> bool {
-        self.did_search
-    }
-
     /// Set the alarm off.
     pub fn is_now(&mut self) -> bool {
         let local = Local::now();
         if local.weekday() == self.weekday && local.hour() == self.hour && local.minute() == self.minute {
+            self.did_search = false;
+            self.did_send = false;
             true
         } else {
             false
