@@ -56,7 +56,7 @@ impl ChromeDriver {
         let token = keyword
             .split_ascii_whitespace()
             .into_iter()
-            .map(|x| String::from(x))
+            .map(String::from)
             .collect::<Vec<String>>();
 
         // Join tokens with "self.blank_token" separator.
