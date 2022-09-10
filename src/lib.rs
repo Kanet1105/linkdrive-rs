@@ -23,11 +23,11 @@ pub fn run_app() -> Result<(), Exception> {
     loop {
         let mut crawler_mut = crawler.borrow_mut();
         match crawler_mut.is_now() {
-            Ok(bool_value) => { if bool_value == true {
+            Ok(bool_value) => { if bool_value {
                 // Set the event off only when
                 // "bool_value" == true && "flag" == false.
                 let mut flag_mut = flag.borrow_mut();
-                if *flag_mut == false {
+                if !(*flag_mut) {
                     match crawler_mut.search() {
                         Ok(()) => {},
                         Err(e) => { dbg!(e); }
