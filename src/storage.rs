@@ -324,7 +324,7 @@ impl Settings {
         };
         
         // Never allow an empty field.
-        if &id == "" || &password == "" {
+        if &id.is_emtpy() || &password.is_empty() {
             let message = "Email ID / Password field is empty.".to_string();
             return Err(Box::new(ProfileException(message)))
         }
