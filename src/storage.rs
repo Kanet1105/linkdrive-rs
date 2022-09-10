@@ -57,11 +57,7 @@ impl Storage {
         // Only write to the file when the keyword has already been added,
         // but the paper by the key is not in the hashmap.
         let reader = self.keyword.read().unwrap();
-        if !self.contains_key(&href) && reader.contains(&keyword) {
-            true
-        } else {
-            false
-        }
+        !self.contains_key(&href) && reader.contains(&keyword)
     }
 
     /// Utilizes [std::mem::take] and [std::mem::replace] to replace the 
