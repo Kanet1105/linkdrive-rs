@@ -9,9 +9,9 @@ use std::sync::RwLock;
 use chrono::prelude::*;
 use config::Config;
 use csv::Writer;
-use lettre::{Message, SmtpTransport, Transport};
 use lettre::message::{header::ContentType, Attachment};
 use lettre::transport::smtp::authentication::Credentials;
+use lettre::{Message, SmtpTransport, Transport};
 
 use crate::load_csv_path;
 use crate::Exception;
@@ -40,14 +40,14 @@ impl Storage {
             file_handle: RwLock::new(file_handle),
         }
     }
-    
+
     pub fn contains_key(&self, key: &str) -> bool {
         let reader = self.storage.read().unwrap();
         reader.contains_key(key)
     }
 
     /// Write to the new storage which will later update the current one.
-    /// It takes a tuple argument consisting of ("keyword", "href") and 
+    /// It takes a tuple argument consisting of ("keyword", "href") and
     /// returns true if the new paper is uploaded.
     pub fn insert(&self, key: (String, String), value: Paper) -> bool {
         let (keyword, href) = key;
@@ -60,29 +60,20 @@ impl Storage {
         !self.contains_key(&href) && reader.contains(&keyword)
     }
 
-    /// Utilizes [std::mem::take] and [std::mem::replace] to replace the 
+    /// Utilizes [std::mem::take] and [std::mem::replace] to replace the
     /// current value with the new value.
     pub fn update(&self, new_keyword: HashSet<String>) {
-        let _ = mem::replace(
-            &mut *self.keyword.write().unwrap(), 
-            new_keyword
-        );
+        let _ = mem::replace(&mut *self.keyword.write().unwrap(), new_keyword);
 
         let new_storage = mem::take(&mut *self.up_storage.write().unwrap());
-        let _ = mem::replace(
-            &mut *self.storage.write().unwrap(), 
-            new_storage,
-        );
+        let _ = mem::replace(&mut *self.storage.write().unwrap(), new_storage);
     }
 
     /// Utilizes [std::mem::replace] to replace the current file handle
     /// with the new one after sending an email.
     pub fn new_file_handle(&self) -> Result<(), Exception> {
         let new_file = Writer::from_path(load_csv_path()?)?;
-        let _ = mem::replace(
-            &mut *self.file_handle.write().unwrap(), 
-            new_file
-        );
+        let _ = mem::replace(&mut *self.file_handle.write().unwrap(), new_file);
         Ok(())
     }
 
@@ -129,7 +120,7 @@ pub struct Paper {
 impl Debug for Paper {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(
-            f, 
+            f,
             "\n\ttitle: {}\n\thref: {}\n\tkeyword: {}\n\tjournal: {}\n\
             ==================================================",
             self.title, self.href, self.keyword, self.journal,
@@ -208,11 +199,12 @@ impl Settings {
     fn update_keyword(&mut self, config: &Config) -> Result<(), Exception> {
         let table = config.get_table("default")?;
         let keyword: HashSet<String> = table
-            .get("keyword").unwrap()
+            .get("keyword")
+            .unwrap()
             .clone()
             .into_array()?
             .iter()
-            .map(|x| { x.to_string() })
+            .map(|x| x.to_string())
             .collect();
         self.keyword = keyword;
         Ok(())
@@ -224,26 +216,22 @@ impl Settings {
     /// ```
     fn update_email(&mut self, config: &Config) -> Result<(), Exception> {
         let table = config.get_table("default")?;
-        let email: String = table
-            .get("email").unwrap()
-            .to_string();
+        let email: String = table.get("email").unwrap().to_string();
         self.email = email;
         Ok(())
     }
 
     /// The hour and the minute to receive the email on.
-    /// 
+    ///
     /// 0 <= "HH" < 24
-    /// 
+    ///
     /// 0 <= "MM" < 60
     /// ```
-    /// time = "HH:MM" 
+    /// time = "HH:MM"
     /// ```
     fn update_time(&mut self, config: &Config) -> Result<(), Exception> {
         let table = config.get_table("default")?;
-        let alarm_time = table
-            .get("time").unwrap()
-            .to_string();
+        let alarm_time = table.get("time").unwrap().to_string();
 
         // Missing splicer ':'.
         if !alarm_time.contains(':') {
@@ -264,20 +252,20 @@ impl Settings {
                 let hour = time_str.parse::<u32>()?;
                 if hour >= 24 {
                     let message = "Set hour between 0 <= 'HH' < 24".to_string();
-                    return Err(Box::new(TimeFormatException((message, hour.to_string()))))
+                    return Err(Box::new(TimeFormatException((message, hour.to_string()))));
                 }
 
                 Ok(hour)
-            },
+            }
             UnitTime::Minute => {
                 let minute = time_str.parse::<u32>()?;
                 if minute >= 60 {
                     let message = "Set minute between 0 <= 'MM' < 60".to_string();
-                    return Err(Box::new(TimeFormatException((message, minute.to_string()))))
+                    return Err(Box::new(TimeFormatException((message, minute.to_string()))));
                 }
 
                 Ok(minute)
-            },
+            }
         }
     }
 
@@ -287,9 +275,7 @@ impl Settings {
     /// ```
     fn update_weekday(&mut self, config: &Config) -> Result<(), Exception> {
         let table = config.get_table("default")?;
-        let weekday_value = table
-            .get("weekday").unwrap()
-            .to_string();
+        let weekday_value = table.get("weekday").unwrap().to_string();
 
         self.weekday = match weekday_value.as_str() {
             "Mon" => Ok(Weekday::Mon),
@@ -306,7 +292,7 @@ impl Settings {
 
     /// /// # Warning
     /// Never upload the "Settings.toml" file with user id and password!
-    /// 
+    ///
     /// ```
     /// id = "user id"
     /// password = "user password"
@@ -314,19 +300,15 @@ impl Settings {
     fn update_profile(&mut self, config: &Config) -> Result<(), Exception> {
         let table = config.get_table("profile")?;
         let (id, password): (String, String) = {
-            let id: String = table
-                .get("id").unwrap()
-                .to_string();
-            let password: String = table
-                .get("password").unwrap()
-                .to_string();
+            let id: String = table.get("id").unwrap().to_string();
+            let password: String = table.get("password").unwrap().to_string();
             (id, password)
         };
-        
+
         // Never allow an empty field.
         if id.is_empty() || password.is_empty() {
             let message = "Email ID / Password field is empty.".to_string();
-            return Err(Box::new(ProfileException(message)))
+            return Err(Box::new(ProfileException(message)));
         }
 
         if self.mailer.is_none() {
@@ -334,9 +316,11 @@ impl Settings {
             let credentials = Credentials::new(id.to_string(), password);
 
             // Open a remote connection to naver SMTP server.
-            self.mailer = Some(SmtpTransport::relay("smtp.naver.com")?
-                .credentials(credentials)
-                .build());
+            self.mailer = Some(
+                SmtpTransport::relay("smtp.naver.com")?
+                    .credentials(credentials)
+                    .build(),
+            );
         }
 
         self.id = id;
@@ -350,7 +334,7 @@ impl Settings {
         let file_body = fs::read(load_csv_path()?)?;
         let content_type = ContentType::parse("text/csv")?;
         let attachment = Attachment::new(file_name).body(file_body, content_type);
-        
+
         // Build the message block.
         let email = self.email.clone();
         let message = Message::builder()
@@ -363,8 +347,10 @@ impl Settings {
         match mailer.send(&message) {
             Ok(_) => {
                 println!("Message sent at [{}]", local_time);
-            },
-            Err(e) => { dbg!(e); },
+            }
+            Err(e) => {
+                dbg!(e);
+            }
         }
         Ok(())
     }
@@ -378,7 +364,7 @@ impl Debug for TimeFormatException {
             "\n\t{}\n\
             \ttime = {} is not a valid time format.\n\
             \ttime = 'HH:MM' is the valid format.",
-            &self.0.0, &self.0.1
+            &self.0 .0, &self.0 .1
         );
         write!(f, "{}", buffer)
     }
@@ -390,7 +376,7 @@ impl Display for TimeFormatException {
             "\n\t{}\n\
             \ttime = {} is not a valid time format.\n\
             \ttime = 'HH:MM' is the valid format.",
-            &self.0.0, &self.0.1
+            &self.0 .0, &self.0 .1
         );
         write!(f, "{}", buffer)
     }
@@ -402,7 +388,8 @@ pub struct WeekdayException(String);
 
 impl Debug for WeekdayException {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, 
+        write!(
+            f,
             "\n\tweekday = '{}' is not a valid weekday format.\nChoose from\n\
             \t'Mon'\n\
             \t'Tue'\n\
@@ -418,7 +405,8 @@ impl Debug for WeekdayException {
 
 impl Display for WeekdayException {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, 
+        write!(
+            f,
             "\n\tweekday = '{}' is not a valid weekday format.\nChoose from\n\
             \t'Mon'\n\
             \t'Tue'\n\

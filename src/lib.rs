@@ -23,30 +23,34 @@ pub fn run_app() -> Result<(), Exception> {
     loop {
         let mut crawler_mut = crawler.borrow_mut();
         match crawler_mut.is_now() {
-            Ok(bool_value) => { if bool_value {
-                // Set the event off only when
-                // "bool_value" == true && "flag" == false.
-                let mut flag_mut = flag.borrow_mut();
-                if !(*flag_mut) {
-                    match crawler_mut.search() {
-                        Ok(()) => {},
-                        Err(e) => { dbg!(e); }
+            Ok(bool_value) => {
+                if bool_value {
+                    // Set the event off only when
+                    // "bool_value" == true && "flag" == false.
+                    let mut flag_mut = flag.borrow_mut();
+                    if !(*flag_mut) {
+                        match crawler_mut.search() {
+                            Ok(()) => {}
+                            Err(e) => {
+                                dbg!(e);
+                            }
+                        }
+                        *flag_mut = true;
+                        continue;
+                    } else {
+                        sleep(Duration::from_secs(1));
+                        continue;
                     }
-                    *flag_mut = true;
-                    continue
                 } else {
-                    sleep(Duration::from_secs(1));
-                    continue
+                    // Otherwise, set the flag back to false.
+                    let mut flag_mut = flag.borrow_mut();
+                    *flag_mut = false;
                 }
-            } else {
-                // Otherwise, set the flag back to false.
-                let mut flag_mut = flag.borrow_mut();
-                *flag_mut = false;
-            }},
-            Err(e) => { 
+            }
+            Err(e) => {
                 dbg!(e);
-                sleep(Duration::from_secs(1)); 
-            },
+                sleep(Duration::from_secs(1));
+            }
         }
     }
 }

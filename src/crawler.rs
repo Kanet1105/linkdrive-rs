@@ -7,11 +7,11 @@ use chrono::prelude::*;
 use headless_chrome::{Browser, Element, LaunchOptionsBuilder, Tab};
 use rayon::prelude::*;
 
-use crate::Exception;
 use crate::storage::{Paper, Storage};
+use crate::Exception;
 
 /// # ChromeDriver
-/// 
+///
 /// Blocking client
 pub struct ChromeDriver {
     #[allow(unused)]
@@ -26,7 +26,7 @@ pub struct ChromeDriver {
 
 impl ChromeDriver {
     /// The function initializes the web driver client with a read-only javascript "Tab" object.
-    /// 
+    ///
     /// # WARNING
     /// Although "Arc<Tab>" seems to be thread-safe, the Tab object is actually a web api call
     /// that returns a shared reference to the current window handle. Javascript Window object
@@ -72,12 +72,15 @@ impl ChromeDriver {
         Ok(query)
     }
 
-    /// The function starts searching for result for each keyword, 
+    /// The function starts searching for result for each keyword,
     /// parses the html element, filters the result and saves changes.
     pub fn search(&mut self) -> Result<(), Exception> {
         let outer_selector = "#srp-results-list";
-        let last_element = format!("#srp-results-list > ol > li:nth-child({})", self.max_indices_per_page);
-        
+        let last_element = format!(
+            "#srp-results-list > ol > li:nth-child({})",
+            self.max_indices_per_page
+        );
+
         // Scrape the page with initialized query strings.
         let new_keyword = self.storage.keyword_from_settings();
         for keyword in &new_keyword {
@@ -85,12 +88,15 @@ impl ChromeDriver {
             self.main_tab
                 .navigate_to(&url)?
                 .wait_until_navigated()?
-                .wait_for_element_with_custom_timeout(&last_element, Duration::from_millis(10000))?;
-                
+                .wait_for_element_with_custom_timeout(
+                    &last_element,
+                    Duration::from_millis(10000),
+                )?;
+
             // Timeout set to 10 seconds.
             let result_list = self.main_tab.wait_for_element_with_custom_timeout(
-                outer_selector, 
-                Duration::from_millis(10000)
+                outer_selector,
+                Duration::from_millis(10000),
             )?;
             let li_list = result_list.wait_for_elements("li")?;
 
@@ -100,68 +106,57 @@ impl ChromeDriver {
         self.storage.update(new_keyword);
 
         // Send an email.
-        let local_time = Local::now()
-            .naive_local()
-            .to_string();
+        let local_time = Local::now().naive_local().to_string();
         self.storage.send_email(&local_time)?;
-        
+
         // Get a new file handle.
         self.storage.new_file_handle()?;
         Ok(())
     }
 
     /// Multi-threaded parser utilizing ["rayon"].
-    fn parse(
-        &self, 
-        item_list: Vec<Element>, 
-        keyword: &str, 
-        domain: &str,
-    ) -> Result<(), Exception> {
+    fn parse(&self, item_list: Vec<Element>, keyword: &str, domain: &str) -> Result<(), Exception> {
         let storage = self.storage.clone();
 
         // Parse items in the list.
-        item_list
-            .par_iter()
-            .for_each(|item| {
-                // Get attributes to check if the html element contains a valid result.
-                let attr = item.get_attributes()
-                    .unwrap()
-                    .unwrap();
+        item_list.par_iter().for_each(|item| {
+            // Get attributes to check if the html element contains a valid result.
+            let attr = item.get_attributes().unwrap().unwrap();
 
-                // Continue when "!attr.is_empty() and exclude the download link."
-                if !attr.is_empty() && attr.len() == 4 {
-                    let elements = item.wait_for_elements("a").unwrap();
+            // Continue when "!attr.is_empty() and exclude the download link."
+            if !attr.is_empty() && attr.len() == 4 {
+                let elements = item.wait_for_elements("a").unwrap();
 
-                    // Parse href and uref out of the content string.
-                    let href = {
-                        let content = elements[0].get_content().unwrap();
-                        let tokens: Vec<_> = content.split('"').collect();
+                // Parse href and uref out of the content string.
+                let href = {
+                    let content = elements[0].get_content().unwrap();
+                    let tokens: Vec<_> = content.split('"').collect();
 
-                        // The complete href.
-                        let mut href = String::from(domain);
-                        href.push_str(tokens[3]);
+                    // The complete href.
+                    let mut href = String::from(domain);
+                    href.push_str(tokens[3]);
 
-                        href
-                    };
+                    href
+                };
 
-                    // Build the paper struct.
-                    let paper = Paper {
-                        title: elements[0].get_inner_text().unwrap(),
-                        href: href.to_string(),
-                        keyword: keyword.into(),
-                        journal: elements[1].get_inner_text().unwrap(),
-                    };
+                // Build the paper struct.
+                let paper = Paper {
+                    title: elements[0].get_inner_text().unwrap(),
+                    href: href.to_string(),
+                    keyword: keyword.into(),
+                    journal: elements[1].get_inner_text().unwrap(),
+                };
 
-                    // Build the uid tuple
-                    let uid = (keyword.to_string(), href);
-                    let result = storage.insert(uid, paper.clone());
-                    
-                    // Write to the file.
-                    if result {
-                        storage.write_to_file(paper).unwrap();
-                    }
+                // Build the uid tuple
+                let uid = (keyword.to_string(), href);
+                let result = storage.insert(uid, paper.clone());
+
+                // Write to the file.
+                if result {
+                    storage.write_to_file(paper).unwrap();
                 }
-            });
+            }
+        });
         Ok(())
     }
 
