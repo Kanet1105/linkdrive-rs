@@ -81,7 +81,7 @@ impl ChromeDriver {
         // Scrape the page with initialized query strings.
         let new_keyword = self.storage.keyword_from_settings();
         for keyword in &new_keyword {
-            let url = self.query_from_keyword(&keyword)?;
+            let url = self.query_from_keyword(keyword)?;
             self.main_tab
                 .navigate_to(&url)?
                 .wait_until_navigated()?
@@ -89,13 +89,13 @@ impl ChromeDriver {
                 
             // Timeout set to 10 seconds.
             let result_list = self.main_tab.wait_for_element_with_custom_timeout(
-                &outer_selector, 
+                outer_selector, 
                 Duration::from_millis(10000)
             )?;
             let li_list = result_list.wait_for_elements("li")?;
 
             // Parallel parse() execution.
-            self.parse(li_list, &keyword, &self.domain_string)?;
+            self.parse(li_list, keyword, &self.domain_string)?;
         }
         self.storage.update(new_keyword);
 
