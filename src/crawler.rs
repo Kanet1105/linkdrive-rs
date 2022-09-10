@@ -153,7 +153,7 @@ impl ChromeDriver {
                     };
 
                     // Build the uid tuple
-                    let uid = (keyword.to_string(), href.to_string());
+                    let uid = (keyword.to_string(), href);
                     let result = storage.insert(uid, paper.clone());
                     
                     // Write to the file.
