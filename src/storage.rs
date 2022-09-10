@@ -52,7 +52,7 @@ impl Storage {
     pub fn insert(&self, key: (String, String), value: Paper) -> bool {
         let (keyword, href) = key;
         let mut writer = self.up_storage.write().unwrap();
-        writer.insert(href.to_string(), value.clone());
+        writer.insert(href.to_string(), value);
 
         // Only write to the file when the keyword has already been added,
         // but the paper by the key is not in the hashmap.
@@ -248,7 +248,7 @@ impl Settings {
         // Missing splicer ':'.
         if !alarm_time.contains(':') {
             let message = "Missing splicer ':' in the time format.".to_string();
-            return Err(Box::new(TimeFormatException((message, alarm_time.into()))));
+            return Err(Box::new(TimeFormatException((message, alarm_time))));
         }
 
         // Wrong format or range.
@@ -331,7 +331,7 @@ impl Settings {
 
         if self.mailer.is_none() {
             // Set credentials for SMTP protocol.
-            let credentials = Credentials::new(id.to_string(), password.to_string());
+            let credentials = Credentials::new(id.to_string(), password);
 
             // Open a remote connection to naver SMTP server.
             self.mailer = Some(SmtpTransport::relay("smtp.naver.com")?
