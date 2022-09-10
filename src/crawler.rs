@@ -1,4 +1,5 @@
 use std::ffi::OsString;
+use std::fmt::Write;
 use std::sync::Arc;
 use std::time::Duration;
 
@@ -34,7 +35,7 @@ impl ChromeDriver {
         let user_agent = OsString::from("--user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/104.0.0.0 Safari/537.36");
         let options = LaunchOptionsBuilder::default()
             .args(vec![&user_agent])
-            .headless(true)
+            .headless(false)
             .build()?;
         let browser = Browser::new(options)?;
         let main_tab = browser.wait_for_initial_tab()?;
@@ -66,7 +67,7 @@ impl ChromeDriver {
         // the search keyword.
         let mut query = String::from(&self.base_query_string);
         query.push_str(&search_keyword);
-        query.push_str(&format!("&show={}", self.max_indices_per_page));
+        let _ = write!(&mut query, "&show={}", self.max_indices_per_page);
         query.push_str("&sortBy=date");
         Ok(query)
     }
