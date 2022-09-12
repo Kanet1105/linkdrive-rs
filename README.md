@@ -12,7 +12,7 @@
 
 3. linkdrive-rs 폴더 내로 들어간 후 (cd linkdrive-rs)
 
-  ```cargo build --release```
+    ```cargo build --release```
 
 4. 생성된 target/release 폴더 내에서 Settings.toml 폴더를 복사 
 붙여넣거나 또는 Settings toml 파일을 target/release 폴더 내에 
