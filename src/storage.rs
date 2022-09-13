@@ -22,6 +22,7 @@ pub struct Storage {
     up_storage: RwLock<HashMap<String, Paper>>,
     settings: RwLock<Settings>,
     file_handle: RwLock<Writer<File>>,
+    counter: RwLock<u32>,
 }
 
 impl Storage {
@@ -38,6 +39,7 @@ impl Storage {
             up_storage: RwLock::new(up_storage),
             settings: RwLock::new(settings),
             file_handle: RwLock::new(file_handle),
+            counter: RwLock::new(0),
         }
     }
 
@@ -98,12 +100,19 @@ impl Storage {
         let mut writer = self.file_handle.write().unwrap();
         writer.serialize(paper)?;
         writer.flush()?;
+        
+        let mut counter = self.counter.write().unwrap();
+        *counter += 1;
         Ok(())
     }
 
     pub fn send_email(&self, local_time: &str) -> Result<(), Exception> {
-        let writer = self.settings.write().unwrap();
-        writer.send_email(local_time)?;
+        let mut counter = self.counter.write().unwrap();
+        if *counter > 0 {
+            let writer = self.settings.write().unwrap();
+            writer.send_email(local_time)?;
+            *counter = 0;
+        }
         Ok(())
     }
 }
