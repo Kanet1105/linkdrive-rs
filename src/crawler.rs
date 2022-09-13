@@ -105,7 +105,7 @@ impl ChromeDriver {
         }
         self.storage.update(new_keyword);
 
-        // Send an email.
+        // Send an email, if and only if the list is not empty.
         let local_time = Local::now().naive_local().to_string();
         self.storage.send_email(&local_time)?;
 
