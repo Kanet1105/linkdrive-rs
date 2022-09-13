@@ -33,14 +33,9 @@ impl ChromeDriver {
     /// can be mutated at any point without the Rust implementation of interior mutability.
     pub fn new() -> Result<Self, Exception> {
         let user_agent = OsString::from("--user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/105.0.0.0 Safari/537.36");
-        // let mut driver_path = std::env::current_dir()?;
-        // driver_path.push("chromedriver_win32");
-        // driver_path.push("chromedriver.exe");
-
         let options = LaunchOptionsBuilder::default()
             .args(vec![&user_agent])
-            // .path(Some(driver_path))
-            .headless(false)
+            .headless(true)
             .build()?;
         let browser = Browser::new(options)?;
         let main_tab = browser.wait_for_initial_tab()?;
@@ -178,5 +173,12 @@ impl ChromeDriver {
         let local_time = self.local_now();
         let time_set = self.storage.time_from_settings();
         Ok(local_time == time_set)
+    }
+
+    pub fn avoid_timeout(&mut self) -> Result<(), Exception> {
+        let new_tab = self.browser.new_tab()?;
+        let current_tab = std::mem::replace(&mut self.main_tab, new_tab);
+        current_tab.close(true)?;
+        Ok(())
     }
 }

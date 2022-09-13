@@ -29,6 +29,7 @@ pub fn run_app() -> Result<(), Exception> {
 
     loop {
         let mut crawler_mut = crawler.borrow_mut();
+        crawler_mut.avoid_timeout()?;
         match crawler_mut.is_now() {
             Ok(bool_value) => {
                 if bool_value {
@@ -45,38 +46,23 @@ pub fn run_app() -> Result<(), Exception> {
                         *flag_mut = true;
                         continue;
                     } else {
-                        sleep(Duration::from_secs(1));
+                        sleep(Duration::from_millis(1600));
                         continue;
                     }
                 } else {
                     // Otherwise, set the flag back to false.
                     let mut flag_mut = flag.borrow_mut();
                     *flag_mut = false;
+                    sleep(Duration::from_millis(1600));
                 }
             }
             Err(e) => {
                 dbg!(e);
-                sleep(Duration::from_secs(1));
+                sleep(Duration::from_millis(1600));
             }
         }
     }
 }
-
-// /// Load configurations from the Settings.toml file located at
-// /// the program root directory.
-// fn load_config() -> Result<Config, Exception> {
-//     // The base path for configs ("./Settings.toml").
-//     let mut settings_path = current_dir()?;
-//     settings_path.push("Settings.toml");
-//     let settings_path_str = settings_path.to_str().unwrap();
-
-//     // Build the config file.
-//     let config = Config::builder()
-//         .add_source(config::File::with_name(settings_path_str))
-//         .add_source(config::Environment::with_prefix("APP"))
-//         .build()?;
-//     Ok(config)
-// }
 
 fn load_csv_path() -> Result<PathBuf, Exception> {
     let mut csv_path = current_dir()?;
