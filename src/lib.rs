@@ -5,8 +5,6 @@ use std::cell::RefCell;
 use std::env::current_dir;
 use std::path::PathBuf;
 use std::rc::Rc;
-use std::thread::sleep;
-use std::time::Duration;
 
 use crawler::ChromeDriver;
 
@@ -46,19 +44,16 @@ pub fn run_app() -> Result<(), Exception> {
                         *flag_mut = true;
                         continue;
                     } else {
-                        sleep(Duration::from_millis(1600));
                         continue;
                     }
                 } else {
                     // Otherwise, set the flag back to false.
                     let mut flag_mut = flag.borrow_mut();
                     *flag_mut = false;
-                    sleep(Duration::from_millis(1600));
                 }
             }
             Err(e) => {
                 dbg!(e);
-                sleep(Duration::from_millis(1600));
             }
         }
     }

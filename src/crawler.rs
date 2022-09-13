@@ -179,6 +179,7 @@ impl ChromeDriver {
         let new_tab = self.browser.new_tab()?;
         let current_tab = std::mem::replace(&mut self.main_tab, new_tab);
         current_tab.close(true)?;
+        std::thread::sleep(Duration::from_millis(1600));
         Ok(())
     }
 }
