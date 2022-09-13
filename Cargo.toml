@@ -7,7 +7,7 @@ edition = "2021"
 config = "0.13.1"
 chrono = "0.4"
 csv = "1.1"
-headless_chrome = { git = "https://github.com/atroche/rust-headless-chrome" }
+headless_chrome = {git = "https://github.com/atroche/rust-headless-chrome", features = ["fetch"]}
 lettre = "0.10"
 rayon = "1.5"
 serde = { version = "1", features = ["derive"] }

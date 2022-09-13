@@ -32,7 +32,7 @@ impl ChromeDriver {
     /// that returns a shared reference to the current window handle. Javascript Window object
     /// can be mutated at any point without the Rust implementation of interior mutability.
     pub fn new() -> Result<Self, Exception> {
-        let user_agent = OsString::from("--user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/104.0.0.0 Safari/537.36");
+        let user_agent = OsString::from("--user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/105.0.0.0 Safari/537.36");
         let options = LaunchOptionsBuilder::default()
             .args(vec![&user_agent])
             .headless(false)
