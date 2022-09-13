@@ -35,7 +35,7 @@ impl ChromeDriver {
         let user_agent = OsString::from("--user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/104.0.0.0 Safari/537.36");
         let options = LaunchOptionsBuilder::default()
             .args(vec![&user_agent])
-            .headless(true)
+            .headless(false)
             .build()?;
         let browser = Browser::new(options)?;
         let main_tab = browser.wait_for_initial_tab()?;
