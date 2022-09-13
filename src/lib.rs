@@ -17,11 +17,11 @@ pub type Exception = Box<dyn std::error::Error>;
 pub fn run_app() -> Result<(), Exception> {
     // Initialize the crawler and the flag as a mutable reference.
     let web_driver = ChromeDriver::new()?;
-    println!("Initializing the Chrome driver.");
+    dbg!("Initializing the Chrome driver.");
     
     let crawler = Rc::new(RefCell::new(web_driver));
     let flag = Rc::new(RefCell::new(false));
-    println!("running..");
+    dbg!("running..");
 
     loop {
         let mut crawler_mut = crawler.borrow_mut();
